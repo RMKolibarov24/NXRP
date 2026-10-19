@@ -1,0 +1,17 @@
+.vs/
+Debug/
+Release/
+x64/
+x86/
+Win32/
+build/
+out/
+*.user
+*.suo
+*.obj
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.pch
+*.ipch
