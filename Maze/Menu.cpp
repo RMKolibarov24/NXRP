@@ -9,7 +9,6 @@ int showMenu()
     while (true)
     {
         std::cout << "\n========== MAZE ==========\n";
-        std::cout << "        Team NXRP\n\n";
         std::cout << "1. Continue\n";
         std::cout << "2. New Game\n";
         std::cout << "3. How to Play\n";
@@ -29,9 +28,7 @@ int showMenu()
         }
 
         std::cin.clear();
-        std::cin.ignore(
-            std::numeric_limits<std::streamsize>::max(), '\n'
-        );
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
         std::cout << "Invalid choice. Enter a number from 1 to 5.\n";
     }
