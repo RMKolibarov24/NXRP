@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>@NXRP_SFML_SOURCE_DIR@/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SFML_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$<TARGET_LINKER_FILE:sfml-graphics>;$<TARGET_LINKER_FILE:sfml-window>;$<TARGET_LINKER_FILE:sfml-system>;$<TARGET_LINKER_FILE:harfbuzz>;$<TARGET_LINKER_FILE:freetype>;opengl32.lib;winmm.lib;gdi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

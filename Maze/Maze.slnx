@@ -1,9 +1,0 @@
-<Solution>
-  <Configurations>
-    <Platform Name="x64" />
-    <Platform Name="x86" />
-  </Configurations>
-  <Project Path="../Maze.Data/Maze.Data.vcxproj" Id="475783e0-f973-4fb5-b474-d6d3fad37bbb" />
-  <Project Path="../Maze.Logic/Maze.Logic.vcxproj" Id="809766bc-631a-4592-af2f-271572e7a21c" />
-  <Project Path="Maze.vcxproj" Id="0f28e8fe-e755-4a8b-8003-b37d2926a1ee" />
-</Solution>
