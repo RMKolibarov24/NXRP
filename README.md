@@ -10,8 +10,13 @@
 4. Използвай **Build → Build Solution**, след това **F5** или **Ctrl+F5**.
 
 Приложението е `build/bin/Debug/Maze.Graphics.exe`. Ресурсите от `assets/`
-се копират до него при build. Засега прозорецът има демонстрационен бутон
-New Game, който променя заглавието; още няма лабиринт и движение.
+се копират до него при build.
+
+The main menu has Continue, New Game, How to Play, Settings, and Exit. Continue
+is disabled without an active game. How to Play shows the maze rules. Settings
+lets you save or cancel row/column values from 10 to 50. Esc returns from those
+screens to the menu. Exit closes the window. New Game returns a menu action
+and currently reports that maze creation is unavailable; it does not start a game.
 
 ## Проекти
 
@@ -65,4 +70,5 @@ throws `std::invalid_argument` before allocation. New cells are all `MazeCell::W
 `MazeSize` values can still hold invalid input for validation without allocating.
 
 `GameState` starts in the menu with an empty grid, a 10x10 selected size and a
-player position of (0,0). No game or maze-generation behavior is wired into the GUI yet.
+player position of (0,0). The GUI updates selectedSize through Settings. Maze
+generation and playable-game controls are not connected yet.

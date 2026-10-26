@@ -1,20 +1,21 @@
 #include <SFML/Graphics.hpp>
-#include <cmath>
 #include <filesystem>
 #include <iostream>
 
+#include "GameState.h"
+#include "Maze.Validation.h"
+#include "menu.h"
+
 int main(int, char* argv[])
 {
-    sf::RenderWindow window(
-        sf::VideoMode({ 900u, 600u }), "NXRP - Maze"
-    );
+    sf::RenderWindow window(sf::VideoMode({ 900u, 600u }), "NXRP - Maze");
+    window.setMinimumSize(sf::Vector2u{ 640u, 560u });
     window.setFramerateLimit(60);
+    window.setKeyRepeatEnabled(false);
 
-    // Resolve resources from the executable directory, not the working directory.
-    sf::Font font;
     const auto fontPath = std::filesystem::absolute(argv[0]).parent_path()
         / "assets" / "fonts" / "SourceSans3-Semibold.ttf";
-
+    sf::Font font;
     if (!font.openFromFile(fontPath))
     {
         std::cerr << "Could not load the font: " << fontPath << '\n';
@@ -22,97 +23,71 @@ int main(int, char* argv[])
     }
     font.setSmooth(false);
 
-    // Create the button background
-    sf::RectangleShape button({ 260.f, 70.f });
-    button.setPosition({ 320.f, 265.f });
-
-    // Create and center the label
-    sf::Text label(font, "New Game", 28);
-    label.setFillColor(sf::Color::White);
-
-    const auto bounds = label.getLocalBounds();
-    // Keep glyphs on whole pixels instead of sampling between texture pixels.
-    label.setOrigin({
-        std::round(bounds.position.x + bounds.size.x / 2.f),
-        std::round(bounds.position.y + bounds.size.y / 2.f)
-    });
-    label.setPosition(
-        button.getPosition() + button.getSize() / 2.f
-    );
-
-    const auto resizeLayout = [&window, &button, &label](sf::Vector2u size)
+    GameState game;
+    Menu menu(font);
+    const auto resize = [&window, &menu](sf::Vector2u size)
     {
-        if (size.x == 0 || size.y == 0)
-        {
-            return;
-        }
-
-        // Keep one view unit equal to one window pixel when resizing.
-        const sf::Vector2f viewSize{
+        if (size.x == 0 || size.y == 0) return;
+        window.setView(sf::View(sf::FloatRect({ 0.f, 0.f }, {
             static_cast<float>(size.x), static_cast<float>(size.y)
-        };
-        window.setView(sf::View(sf::FloatRect({ 0.f, 0.f }, viewSize)));
-        button.setPosition({
-            std::round((viewSize.x - button.getSize().x) / 2.f),
-            std::round((viewSize.y - button.getSize().y) / 2.f)
-        });
-        label.setPosition(button.getPosition() + button.getSize() / 2.f);
+        })));
+        menu.resize(size);
     };
-    resizeLayout(window.getSize());
+    resize(window.getSize());
 
     while (window.isOpen())
     {
+        menu.setHasActiveGame(game.hasActiveGame());
         while (const auto event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>())
             {
                 window.close();
+                break;
             }
-
             if (const auto* resized = event->getIf<sf::Event::Resized>())
-            {
-                resizeLayout(resized->size);
-            }
+                resize(resized->size);
 
-            if (const auto* click =
-                event->getIf<sf::Event::MouseButtonPressed>())
+            switch (menu.handleEvent(*event, window))
             {
-                if (click->button == sf::Mouse::Button::Left)
+            case MenuAction::HowToPlay:
+                menu.showHowToPlay();
+                break;
+            case MenuAction::Settings:
+                menu.showSettings(game.selectedSize);
+                break;
+            case MenuAction::Back:
+                menu.showMain();
+                break;
+            case MenuAction::ApplySettings:
+                if (isValidMazeSize(menu.draftSize()))
                 {
-                    const auto position =
-                        window.mapPixelToCoords(click->position);
-
-                    if (button.getGlobalBounds().contains(position))
-                    {
-                        // Part 1 keeps the existing demo; gameplay comes later.
-                        window.setTitle("New Game selected!");
-                    }
+                    game.selectedSize = menu.draftSize();
+                    menu.showMain();
+                    menu.showMessage("Saved size: " + std::to_string(game.selectedSize.rows)
+                        + " x " + std::to_string(game.selectedSize.cols) + ".");
                 }
+                break;
+            case MenuAction::NewGame:
+                // The controller receives a request; no game is created yet.
+                menu.showMessage("Maze creation is not available yet.");
+                break;
+            case MenuAction::Continue:
+                menu.showMessage("No playable game is available.");
+                break;
+            case MenuAction::Exit:
+                window.close();
+                break;
+            case MenuAction::None:
+                break;
             }
+            if (!window.isOpen()) break;
         }
+        if (!window.isOpen()) break;
 
-        if (!window.isOpen())
-        {
-            break;
-        }
-
-        // Change the color when the mouse is over the button
-        const auto mousePosition = window.mapPixelToCoords(
-            sf::Mouse::getPosition(window)
-        );
-
-        const bool hovered =
-            button.getGlobalBounds().contains(mousePosition);
-
-        button.setFillColor(
-            hovered
-            ? sf::Color{ 80, 140, 230 }
-            : sf::Color{ 45, 90, 170 }
-        );
-
-        window.clear(sf::Color{ 25, 25, 30 });
-        window.draw(button);
-        window.draw(label);
+        menu.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
+        window.clear(sf::Color{ 18, 22, 31 });
+        menu.draw(window);
         window.display();
     }
 }
