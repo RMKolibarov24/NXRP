@@ -1,11 +1,10 @@
-
+<?xml version='1.0' encoding='utf-8'?>
 <Solution>
   <Configurations>
     <Platform Name="x64" />
   </Configurations>
   <Project Path="Maze.Data/Maze.Data.vcxproj" Id="475783e0-f973-4fb5-b474-d6d3fad37bbb" />
-  <Project Path="Maze.Graphics/Maze.Graphics.vcxproj" Id="1dd53546-daa9-483f-99c5-ec38d515a221" />
+  <Project Path="Maze.Graphics/Maze.Graphics.vcxproj" Id="1dd53546-daa9-483f-99c5-ec38d515a221" DefaultStartup="true" />
   <Project Path="Maze.Logic/Maze.Logic.vcxproj" Id="809766bc-631a-4592-af2f-271572e7a21c" />
-  <Project Path="Maze.Tests/Maze.Tests.vcxproj" Id="e8836288-a743-4389-b3bf-eea23a967f2e" />
   <Project Path="Maze.UnitTest/Maze.UnitTest.vcxproj" />
 </Solution>

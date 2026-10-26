@@ -52,3 +52,17 @@ Microsoft Native Unit Test Framework идва с Visual Studio; не се изт
 Засега няма реални тестови методи; празният шаблонен `TestMethod1` е премахнат.
 
 Генерираните файлове под `build/` и `.vs/` са игнорирани от Git.
+
+## Data model
+
+`MazeGrid` stores a two-dimensional grid in one dynamically allocated cell array,
+owned by `std::unique_ptr<MazeCell[]>`. The grid releases its memory automatically.
+It cannot be copied; moving it transfers ownership and leaves the source empty.
+
+Each dimension must be in the inclusive range 10..50. Invalid grid construction
+throws `std::invalid_argument` before allocation. New cells are all `MazeCell::Wall`.
+`at(row, col)` throws `std::out_of_range` outside the grid, including an empty grid.
+`MazeSize` values can still hold invalid input for validation without allocating.
+
+`GameState` starts in the menu with an empty grid, a 10x10 selected size and a
+player position of (0,0). No game or maze-generation behavior is wired into the GUI yet.
