@@ -54,7 +54,20 @@ Microsoft Native Unit Test Framework идва с Visual Studio; не се изт
 от шаблона. Няма собствен `main()` и DLL файлът не се стартира с F5.
 
 След build отвори **Test → Test Explorer** и избери **Run All**.
-Засега няма реални тестови методи; празният шаблонен `TestMethod1` е премахнат.
+The suite contains 26 native tests grouped as `MazeSizeTests`, `MazeGridTests`,
+and `GameStateTests`. They cover the 10/50 size boundaries, invalid dimensions,
+rectangular grids, wall initialization, checked access, fill, move ownership,
+and the initial game state. They use the real Data/Logic implementations and
+do not open an SFML window.
+
+To run them from **Developer Command Prompt for VS 2026** after building:
+
+```bat
+vstest.console.exe build\bin\Debug\Maze.UnitTest.dll /Platform:x64 /Logger:trx /ResultsDirectory:build\TestResults\Debug
+```
+
+For Release, build **Release / x64** and replace both `Debug` paths with `Release`.
+The `.trx` result files stay under the ignored `build/` directory.
 
 Генерираните файлове под `build/` и `.vs/` са игнорирани от Git.
 
