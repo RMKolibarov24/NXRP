@@ -13,16 +13,16 @@
 се копират до него при build.
 
 The main menu has Continue, New Game, How to Play, Settings, and Exit.
-New Game starts the fixed 10x10 demo maze. Press an arrow key to move one cell;
+New Game generates a random maze at the size saved in Settings. Press an arrow key to move one cell;
 walls and boundaries block movement. The display shows the current row/column,
 blocked-move feedback, and victory at the green exit. Esc returns to the menu,
 and Continue resumes a paused game. Continue is disabled before a game and after
 victory. Exit closes the window.
 
-Settings saves separate row/column preferences from 10 to 50. The current demo
-always uses its fixed 10x10 map and preserves those preferences for future games.
-The renderer fits actual grids up to 50x50 when the window is resized. Random
-generation is not implemented yet.
+Settings saves separate row/column preferences from 10 to 50. Changes apply to
+New Game; Continue keeps the existing maze and player position. The generator
+supports both even and odd dimensions, including 10x10 and 50x50. The renderer
+fits the current maze when the window is resized.
 
 ## Проекти
 
@@ -100,7 +100,14 @@ enters Playing. The start must be a passage, with a single exit at the bottom-ri
 Invalid layouts throw before changing the existing game or the supplied grid.
 Movement uses the four directions, respects walls and boundaries, and reports
 Blocked, Moved or Won. Blocked requests leave the game unchanged; reaching the
-exit sets the Won phase. `createDemoMaze()` supplies a fixed, solvable 10x10 map
-for development. The GUI uses this map for New Game. `GameView` draws cells and
-the player from the data model and routes arrow-key events through `tryMove`.
-The map is fixed; random generation is a later addition.
+exit sets the Won phase. `GameView` draws cells and the player from the data
+model and routes arrow-key events through `tryMove`. `createDemoMaze()` remains
+a fixed development fixture; New Game uses the random generator.
+
+`Maze.Generation.h` provides `generateMaze(size)` and `generateMaze(size, seed)`.
+The generator uses iterative randomized depth-first search: it visits rooms
+two cells apart, opens the connecting wall, and backtracks using a stack. All
+rooms connect to (0,0). A short extension joins the last room to the bottom-right
+exit when a dimension is even. Every walkable cell is reachable from the start.
+The seeded overload reproduces a map with the same generator/toolchain; the GUI
+obtains a seed from `std::random_device`. Random maps can occasionally repeat.

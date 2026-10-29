@@ -5,6 +5,7 @@
 
 #include "GameView.h"
 #include "Maze.Game.h"
+#include "Maze.Generation.h"
 #include "Maze.Validation.h"
 #include "menu.h"
 
@@ -89,24 +90,21 @@ int main(int, char* argv[])
                     game.selectedSize = menu.draftSize();
                     menu.showMain();
                     menu.showMessage("Saved size: " + std::to_string(game.selectedSize.rows)
-                        + " x " + std::to_string(game.selectedSize.cols) + ". Demo uses 10 x 10.");
+                        + " x " + std::to_string(game.selectedSize.cols) + ".");
                 }
                 break;
             case MenuAction::NewGame:
                 try
                 {
-                    const MazeSize selectedSize = game.selectedSize;
-                    startGame(game, createDemoMaze());
-                    // Keep the next-game preference separate from this fixed demo's size.
-                    game.selectedSize = selectedSize;
+                    startGame(game, generateMaze(game.selectedSize));
                     gameView.reset();
                     showingGame = true;
-                    window.setTitle("NXRP - Fixed 10x10 demo");
+                    window.setTitle("NXRP - Maze");
                 }
                 catch (const std::exception& error)
                 {
-                    menu.showMessage("Could not start the demo maze.");
-                    std::cerr << "Starting the demo failed: " << error.what() << '\n';
+                    menu.showMessage("Could not start a new maze. Please try again.");
+                    std::cerr << "Starting a new maze failed: " << error.what() << '\n';
                 }
                 break;
             case MenuAction::Continue:
@@ -115,7 +113,7 @@ int main(int, char* argv[])
                     game.phase = GamePhase::Playing;
                     gameView.reset();
                     showingGame = true;
-                    window.setTitle("NXRP - Fixed 10x10 demo");
+                    window.setTitle("NXRP - Maze");
                 }
                 break;
             case MenuAction::Exit:

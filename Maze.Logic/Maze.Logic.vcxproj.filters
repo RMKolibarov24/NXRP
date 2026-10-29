@@ -11,9 +11,11 @@
   <ItemGroup>
     <ClCompile Include="Maze.Logic.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="Maze.Game.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Maze.Generation.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Maze.Validation.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="Maze.Game.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Maze.Generation.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
 </Project>
