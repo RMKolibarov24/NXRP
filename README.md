@@ -85,3 +85,14 @@ throws `std::invalid_argument` before allocation. New cells are all `MazeCell::W
 `GameState` starts in the menu with an empty grid, a 10x10 selected size and a
 player position of (0,0). The GUI updates selectedSize through Settings. Maze
 generation and playable-game controls are not connected yet.
+
+## Gameplay logic
+
+`Maze.Game.h` provides `startGame`, `tryMove` and `hasWon` without SFML or user I/O.
+Starting takes ownership of a prepared maze, resets the player to (0,0), and
+enters Playing. The start must be a passage, with a single exit at the bottom-right.
+Invalid layouts throw before changing the existing game or the supplied grid.
+Movement uses the four directions, respects walls and boundaries, and reports
+Blocked, Moved or Won. Blocked requests leave the game unchanged; reaching the
+exit sets the Won phase. `createDemoMaze()` supplies a fixed, solvable 10x10 map
+for development. It is not random and is not connected to the GUI yet.
