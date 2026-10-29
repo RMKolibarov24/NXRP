@@ -11,6 +11,9 @@
 
 Приложението е `build/bin/Debug/Maze.Graphics.exe`. Ресурсите от `assets/`
 се копират до него при build.
+Font assets are resolved relative to the actual Windows executable directory,
+so launching from another working directory or a PATH command still works.
+A missing font or startup failure reports an error and exits cleanly.
 
 The main menu has Continue, New Game, How to Play, Settings, and Exit.
 New Game generates a random maze at the size saved in Settings. Press an arrow key to move one cell;
@@ -61,14 +64,17 @@ Microsoft Native Unit Test Framework идва с Visual Studio; не се изт
 от шаблона. Няма собствен `main()` и DLL файлът не се стартира с F5.
 
 След build отвори **Test → Test Explorer** и избери **Run All**.
-The suite contains 57 native tests grouped as `MazeSizeTests`, `MazeGridTests`,
-`GameStateTests`, `MazeMovementTests`, and `MazeGenerationTests`. It covers data
+The suite contains 63 native tests grouped as `MazeSizeTests`, `MazeGridTests`,
+`GameStateTests`, `MazeMovementTests`, `MazeGenerationTests`, and
+`MazeSessionTests`. It covers data
 ownership, dimensions, movement in all four directions, walls and boundaries,
 blocked-state preservation, and victory. An independent one-cell BFS checks
 exit reachability and connected passages across all 1,681 allowed size pairs.
 Six fixed seeds cover minimum, intermediate, maximum, and rectangular mazes;
 the suite checks repeatability and follows independently found routes to victory.
 Unseeded maps are checked for validity without requiring them to be unique.
+Session tests also cover ending/restarting games, small/large replacements,
+and preserving the current session when a replacement layout is rejected.
 The tests use the real Data/Logic implementations and open no SFML window.
 
 To run them from **Developer Command Prompt for VS 2026** after building:
@@ -103,9 +109,12 @@ uses the actual maze dimensions; selectedSize remains the next-game preference.
 gameplay, and victory screen. `main.cpp` creates the window/font and runs the
 event/render loop. Settings Save changes the next-game size; Cancel and Esc
 discard the draft. Help and Settings preserve a paused game. New Game starts
-at (0,0), while Continue retains the existing grid and position.
+at (0,0), while Continue retains the existing grid and position. Exit and the
+window-close button call `endGame` to release the maze and reset its player/phase;
+the next-game size is preserved. Preparing and validating a replacement happens
+before replacing the owned grid, so preparation failure preserves the old session.
 
-`Maze.Game.h` provides `startGame`, `tryMove` and `hasWon` without SFML or user I/O.
+`Maze.Game.h` provides `startGame`, `endGame`, `tryMove` and `hasWon` without SFML or user I/O.
 Starting takes ownership of a prepared maze, resets the player to (0,0), and
 enters Playing. The start must be a passage, with a single exit at the bottom-right.
 Invalid layouts throw before changing the existing game or the supplied grid.

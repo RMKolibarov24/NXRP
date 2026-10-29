@@ -54,6 +54,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
 {
     if (event.is<sf::Event::Closed>())
     {
+        endGame(game_);
         window.close();
         return;
     }
@@ -116,6 +117,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         }
         break;
     case MenuAction::Exit:
+        endGame(game_);
         window.close();
         break;
     case MenuAction::None:

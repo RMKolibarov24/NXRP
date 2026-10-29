@@ -70,6 +70,13 @@ void startGame(GameState& game, MazeGrid&& preparedMaze)
     game.phase = GamePhase::Playing;
 }
 
+void endGame(GameState& game) noexcept
+{
+    game.maze = MazeGrid();
+    game.player = { 0, 0 };
+    game.phase = GamePhase::Menu;
+}
+
 bool hasWon(const GameState& game)
 {
     if (!game.maze.contains(game.player)) return false;

@@ -26,6 +26,10 @@ MazeGrid createDemoMaze();
 // before changing either the game or preparedMaze. Reachability is not checked.
 void startGame(GameState& game, MazeGrid&& preparedMaze);
 
+// Releases maze data and resets the player/phase, preserving the next-game size.
+// Safe when already empty; performs no allocation.
+void endGame(GameState& game) noexcept;
+
 // True only when the player occupies the bottom-right cell marked Exit.
 bool hasWon(const GameState& game);
 
