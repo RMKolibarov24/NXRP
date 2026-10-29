@@ -15,9 +15,10 @@
 The main menu has Continue, New Game, How to Play, Settings, and Exit.
 New Game generates a random maze at the size saved in Settings. Press an arrow key to move one cell;
 walls and boundaries block movement. The display shows the current row/column,
-blocked-move feedback, and victory at the green exit. Esc returns to the menu,
-and Continue resumes a paused game. Continue is disabled before a game and after
-victory. Exit closes the window.
+blocked-move feedback, and victory at the green exit. Esc pauses play and opens
+the menu; Continue resumes the same maze and position. Continue is disabled
+before a game and after victory. The victory screen offers New Game and Main
+menu; Esc also returns to the main menu. Exit closes the window.
 
 Settings saves separate row/column preferences from 10 to 50. Changes apply to
 New Game; Continue keeps the existing maze and player position. The generator
@@ -97,6 +98,12 @@ player position of (0,0). The GUI updates selectedSize through Settings. Gamepla
 uses the actual maze dimensions; selectedSize remains the next-game preference.
 
 ## Gameplay logic
+
+`MazeApplication` owns the game and routes events between the menu pages,
+gameplay, and victory screen. `main.cpp` creates the window/font and runs the
+event/render loop. Settings Save changes the next-game size; Cancel and Esc
+discard the draft. Help and Settings preserve a paused game. New Game starts
+at (0,0), while Continue retains the existing grid and position.
 
 `Maze.Game.h` provides `startGame`, `tryMove` and `hasWon` without SFML or user I/O.
 Starting takes ownership of a prepared maze, resets the player to (0,0), and

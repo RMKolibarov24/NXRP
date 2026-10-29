@@ -1,13 +1,8 @@
 #include <SFML/Graphics.hpp>
-#include <exception>
 #include <filesystem>
 #include <iostream>
 
-#include "GameView.h"
-#include "Maze.Game.h"
-#include "Maze.Generation.h"
-#include "Maze.Validation.h"
-#include "menu.h"
+#include "MazeApplication.h"
 
 int main(int, char* argv[])
 {
@@ -26,113 +21,20 @@ int main(int, char* argv[])
     }
     font.setSmooth(false);
 
-    GameState game;
-    Menu menu(font);
-    GameView gameView(font);
-    bool showingGame = false;
-    const auto canContinue = [&game] {
-        return game.hasActiveGame()
-            && (game.phase == GamePhase::Playing || game.phase == GamePhase::Paused);
-    };
-    const auto resize = [&window, &menu, &gameView](sf::Vector2u size)
-    {
-        if (size.x == 0 || size.y == 0) return;
-        window.setView(sf::View(sf::FloatRect({ 0.f, 0.f }, {
-            static_cast<float>(size.x), static_cast<float>(size.y)
-        })));
-        menu.resize(size);
-        gameView.resize(size);
-    };
-    resize(window.getSize());
-
+    MazeApplication application(font);
+    application.resize(window.getSize());
     while (window.isOpen())
     {
-        menu.setHasActiveGame(canContinue());
         while (const auto event = window.pollEvent())
         {
-            if (event->is<sf::Event::Closed>())
-            {
-                window.close();
-                break;
-            }
-            if (const auto* resized = event->getIf<sf::Event::Resized>())
-                resize(resized->size);
-
-            if (showingGame)
-            {
-                const auto* key = event->getIf<sf::Event::KeyPressed>();
-                if (key && key->code == sf::Keyboard::Key::Escape)
-                {
-                    if (game.phase == GamePhase::Playing) game.phase = GamePhase::Paused;
-                    showingGame = false;
-                    menu.setHasActiveGame(canContinue());
-                    menu.showMain();
-                    window.setTitle("NXRP - Maze");
-                }
-                else gameView.handleEvent(*event, game);
-                continue;
-            }
-
-            switch (menu.handleEvent(*event, window))
-            {
-            case MenuAction::HowToPlay:
-                menu.showHowToPlay();
-                break;
-            case MenuAction::Settings:
-                menu.showSettings(game.selectedSize);
-                break;
-            case MenuAction::Back:
-                menu.showMain();
-                break;
-            case MenuAction::ApplySettings:
-                if (isValidMazeSize(menu.draftSize()))
-                {
-                    game.selectedSize = menu.draftSize();
-                    menu.showMain();
-                    menu.showMessage("Saved size: " + std::to_string(game.selectedSize.rows)
-                        + " x " + std::to_string(game.selectedSize.cols) + ".");
-                }
-                break;
-            case MenuAction::NewGame:
-                try
-                {
-                    startGame(game, generateMaze(game.selectedSize));
-                    gameView.reset();
-                    showingGame = true;
-                    window.setTitle("NXRP - Maze");
-                }
-                catch (const std::exception& error)
-                {
-                    menu.showMessage("Could not start a new maze. Please try again.");
-                    std::cerr << "Starting a new maze failed: " << error.what() << '\n';
-                }
-                break;
-            case MenuAction::Continue:
-                if (canContinue())
-                {
-                    game.phase = GamePhase::Playing;
-                    gameView.reset();
-                    showingGame = true;
-                    window.setTitle("NXRP - Maze");
-                }
-                break;
-            case MenuAction::Exit:
-                window.close();
-                break;
-            case MenuAction::None:
-                break;
-            }
+            application.handleEvent(*event, window);
             if (!window.isOpen()) break;
         }
         if (!window.isOpen()) break;
 
+        application.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
         window.clear(sf::Color{ 18, 22, 31 });
-        if (showingGame) gameView.draw(window, game);
-        else
-        {
-            menu.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
-            menu.draw(window);
-        }
+        application.draw(window);
         window.display();
     }
 }

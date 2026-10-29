@@ -28,6 +28,7 @@ public:
     void showMain();
     void showHowToPlay();
     void showSettings(const MazeSize& selectedSize);
+    void showVictory(const MazeSize& completedSize);
     void showMessage(const std::string& message);
     MazeSize draftSize() const noexcept;
 
@@ -36,7 +37,7 @@ public:
     void draw(sf::RenderTarget& target) const;
 
 private:
-    enum class Screen { Main, HowToPlay, Settings };
+    enum class Screen { Main, HowToPlay, Settings, Victory };
 
     struct Button
     {
@@ -65,6 +66,7 @@ private:
     sf::Text subtitle_;
     sf::Text rules_;
     sf::Text message_;
+    sf::Text victorySummary_;
     sf::Text rowName_;
     sf::Text colName_;
     sf::Text rowValue_;
