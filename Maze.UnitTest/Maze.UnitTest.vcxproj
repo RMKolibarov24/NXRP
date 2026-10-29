@@ -100,6 +100,8 @@
     <ClCompile Include="Maze.UnitTest.cpp" />
     <ClCompile Include="MazeGridTests.cpp" />
     <ClCompile Include="GameStateTests.cpp" />
+    <ClCompile Include="MazeMovementTests.cpp" />
+    <ClCompile Include="MazeGenerationTests.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

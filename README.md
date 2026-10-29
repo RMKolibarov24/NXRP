@@ -60,11 +60,15 @@ Microsoft Native Unit Test Framework идва с Visual Studio; не се изт
 от шаблона. Няма собствен `main()` и DLL файлът не се стартира с F5.
 
 След build отвори **Test → Test Explorer** и избери **Run All**.
-The suite contains 26 native tests grouped as `MazeSizeTests`, `MazeGridTests`,
-and `GameStateTests`. They cover the 10/50 size boundaries, invalid dimensions,
-rectangular grids, wall initialization, checked access, fill, move ownership,
-and the initial game state. They use the real Data/Logic implementations and
-do not open an SFML window.
+The suite contains 57 native tests grouped as `MazeSizeTests`, `MazeGridTests`,
+`GameStateTests`, `MazeMovementTests`, and `MazeGenerationTests`. It covers data
+ownership, dimensions, movement in all four directions, walls and boundaries,
+blocked-state preservation, and victory. An independent one-cell BFS checks
+exit reachability and connected passages across all 1,681 allowed size pairs.
+Six fixed seeds cover minimum, intermediate, maximum, and rectangular mazes;
+the suite checks repeatability and follows independently found routes to victory.
+Unseeded maps are checked for validity without requiring them to be unique.
+The tests use the real Data/Logic implementations and open no SFML window.
 
 To run them from **Developer Command Prompt for VS 2026** after building:
 
