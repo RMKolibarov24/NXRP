@@ -90,7 +90,7 @@ void Menu::Button::draw(sf::RenderTarget& target) const
 
 Menu::Menu(const sf::Font& font)
     : font_(font), title_(font, "", 42), subtitle_(font, "", 19),
-      rules_(font, "", 20), message_(font, "", 18),
+      rules_(font, "", 20), message_(font, "", 18), victorySummary_(font, "", 24),
       rowName_(font, "Rows", 24), colName_(font, "Columns", 24),
       rowValue_(font, "", 28), colValue_(font, "", 28), sizeSummary_(font, "", 19),
       mainButtons_{
@@ -107,11 +107,11 @@ Menu::Menu(const sf::Font& font)
       backButton_(font, "Back", MenuAction::Back),
       applyButton_(font, "Save size", MenuAction::ApplySettings)
 {
-    for (auto* text : { &title_, &rules_, &rowName_, &colName_, &rowValue_, &colValue_ })
+    for (auto* text : { &title_, &rules_, &victorySummary_, &rowName_, &colName_, &rowValue_, &colValue_ })
         text->setFillColor(textColor);
     for (auto* text : { &subtitle_, &message_, &sizeSummary_ })
         text->setFillColor(mutedColor);
-    rules_.setLineSpacing(1.6f);
+    rules_.setLineSpacing(1.3f);
     showMain();
 }
 
@@ -122,6 +122,7 @@ void Menu::resize(sf::Vector2u size)
     const float width = static_cast<float>(size.x);
     const float height = static_cast<float>(size.y);
     const float center = std::floor(width / 2.f);
+    title_.setFillColor(screen_ == Screen::Victory ? sf::Color{ 73, 190, 126 } : textColor);
     centerText(title_, { center, 56.f });
     centerText(subtitle_, { center, 103.f });
 
@@ -133,13 +134,15 @@ void Menu::resize(sf::Vector2u size)
 
     message_.setString(wrapText(notice_, font_, 18, width - 80.f));
     centerText(message_, { center, height - 45.f });
+    centerText(victorySummary_, { center, std::floor(height / 2.f - 100.f) });
     rules_.setString(wrapText(
-        "Start in the top-left corner of the maze.\n"
-        "Reach the exit in the bottom-right corner.\n"
-        "Use the arrow keys to move one cell at a time.\n"
-        "Walls and the edge of the maze block movement.\n"
-        "Rows and columns can each range from 10 to 50.\n"
-        "Choose your maze dimensions in Settings.", font_, 20, width - 112.f));
+        "Start in the top-left corner.\n"
+        "Reach the green exit at the bottom-right.\n"
+        "Arrow keys move one cell at a time.\n"
+        "Walls and maze edges block movement.\n"
+        "Esc opens the menu; Continue resumes the same game.\n"
+        "Choose rows and columns (10-50) in Settings.\n"
+        "After winning, choose New Game or Main menu.", font_, 20, width - 112.f));
     rules_.setOrigin({ 0.f, 0.f });
     rules_.setPosition({ std::round((width - rules_.getLocalBounds().size.x) / 2.f), 155.f });
 
@@ -153,11 +156,19 @@ void Menu::resize(sf::Vector2u size)
     sizeButtons_[3].setBounds({ center + 100.f, colTop }, { 48.f, 48.f });
     refreshSettings();
 
-    backButton_.label.setString(screen_ == Screen::Settings ? "Cancel" : "Back");
+    backButton_.label.setString(screen_ == Screen::Settings ? "Cancel"
+        : screen_ == Screen::Victory ? "Main menu" : "Back");
     if (screen_ == Screen::Settings)
     {
         backButton_.setBounds({ center - 160.f, height - 108.f }, { 146.f, 48.f });
         applyButton_.setBounds({ center + 14.f, height - 108.f }, { 146.f, 48.f });
+    }
+    else if (screen_ == Screen::Victory)
+    {
+        mainButtons_[1].setBounds({ center - buttonWidth / 2.f, std::floor(height / 2.f - 24.f) },
+            { buttonWidth, 48.f });
+        backButton_.setBounds({ center - buttonWidth / 2.f, std::floor(height / 2.f + 36.f) },
+            { buttonWidth, 48.f });
     }
     else backButton_.setBounds({ center - 100.f, height - 108.f }, { 200.f, 48.f });
 }
@@ -203,6 +214,19 @@ void Menu::showMessage(const std::string& message)
     resize(viewport_);
 }
 
+void Menu::showVictory(const MazeSize& completedSize)
+{
+    if (!isValidMazeSize(completedSize))
+        throw std::invalid_argument("Victory requires valid completed maze dimensions.");
+    screen_ = Screen::Victory;
+    title_.setString("You escaped!");
+    subtitle_.setString("The maze is complete.");
+    victorySummary_.setString("Maze completed: " + std::to_string(completedSize.rows)
+        + " x " + std::to_string(completedSize.cols));
+    notice_ = "Esc returns to the main menu.";
+    resize(viewport_);
+}
+
 MazeSize Menu::draftSize() const noexcept
 {
     return draftSize_;
@@ -243,6 +267,7 @@ MenuAction Menu::handleEvent(const sf::Event& event, const sf::RenderWindow& win
     else
     {
         if (backButton_.hit(point)) return MenuAction::Back;
+        if (screen_ == Screen::Victory && mainButtons_[1].hit(point)) return MenuAction::NewGame;
         if (screen_ == Screen::Settings)
         {
             if (applyButton_.hit(point)) return MenuAction::ApplySettings;
@@ -265,6 +290,7 @@ void Menu::update(sf::Vector2f mousePosition)
     else
     {
         backButton_.update(mousePosition);
+        if (screen_ == Screen::Victory) mainButtons_[1].update(mousePosition);
         if (screen_ == Screen::Settings)
         {
             applyButton_.update(mousePosition);
@@ -286,6 +312,12 @@ void Menu::draw(sf::RenderTarget& target) const
     {
         backButton_.draw(target);
         if (screen_ == Screen::HowToPlay) target.draw(rules_);
+        else if (screen_ == Screen::Victory)
+        {
+            target.draw(victorySummary_);
+            mainButtons_[1].draw(target);
+            target.draw(message_);
+        }
         else
         {
             target.draw(rowName_);

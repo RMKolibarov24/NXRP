@@ -1,93 +1,49 @@
 #include <SFML/Graphics.hpp>
-#include <filesystem>
+#include <exception>
 #include <iostream>
 
-#include "GameState.h"
-#include "Maze.Validation.h"
-#include "menu.h"
+#include "ExecutablePath.h"
+#include "MazeApplication.h"
 
-int main(int, char* argv[])
+int main()
 {
-    sf::RenderWindow window(sf::VideoMode({ 900u, 600u }), "NXRP - Maze");
-    window.setMinimumSize(sf::Vector2u{ 640u, 560u });
-    window.setFramerateLimit(60);
-    window.setKeyRepeatEnabled(false);
-
-    const auto fontPath = std::filesystem::absolute(argv[0]).parent_path()
-        / "assets" / "fonts" / "SourceSans3-Semibold.ttf";
-    sf::Font font;
-    if (!font.openFromFile(fontPath))
+    try
     {
-        std::cerr << "Could not load the font: " << fontPath << '\n';
-        return 1;
-    }
-    font.setSmooth(false);
-
-    GameState game;
-    Menu menu(font);
-    const auto resize = [&window, &menu](sf::Vector2u size)
-    {
-        if (size.x == 0 || size.y == 0) return;
-        window.setView(sf::View(sf::FloatRect({ 0.f, 0.f }, {
-            static_cast<float>(size.x), static_cast<float>(size.y)
-        })));
-        menu.resize(size);
-    };
-    resize(window.getSize());
-
-    while (window.isOpen())
-    {
-        menu.setHasActiveGame(game.hasActiveGame());
-        while (const auto event = window.pollEvent())
+        const auto fontPath = executableDirectory() / "assets" / "fonts" / "SourceSans3-Semibold.ttf";
+        sf::Font font;
+        if (!font.openFromFile(fontPath))
         {
-            if (event->is<sf::Event::Closed>())
-            {
-                window.close();
-                break;
-            }
-            if (const auto* resized = event->getIf<sf::Event::Resized>())
-                resize(resized->size);
+            std::cerr << "Could not load the font: " << fontPath << '\n';
+            return 1;
+        }
+        font.setSmooth(false);
 
-            switch (menu.handleEvent(*event, window))
+        sf::RenderWindow window(sf::VideoMode({ 900u, 600u }), "NXRP - Maze");
+        window.setMinimumSize(sf::Vector2u{ 640u, 560u });
+        window.setFramerateLimit(60);
+        window.setKeyRepeatEnabled(false);
+
+        MazeApplication application(font);
+        application.resize(window.getSize());
+        while (window.isOpen())
+        {
+            while (const auto event = window.pollEvent())
             {
-            case MenuAction::HowToPlay:
-                menu.showHowToPlay();
-                break;
-            case MenuAction::Settings:
-                menu.showSettings(game.selectedSize);
-                break;
-            case MenuAction::Back:
-                menu.showMain();
-                break;
-            case MenuAction::ApplySettings:
-                if (isValidMazeSize(menu.draftSize()))
-                {
-                    game.selectedSize = menu.draftSize();
-                    menu.showMain();
-                    menu.showMessage("Saved size: " + std::to_string(game.selectedSize.rows)
-                        + " x " + std::to_string(game.selectedSize.cols) + ".");
-                }
-                break;
-            case MenuAction::NewGame:
-                // The controller receives a request; no game is created yet.
-                menu.showMessage("Maze creation is not available yet.");
-                break;
-            case MenuAction::Continue:
-                menu.showMessage("No playable game is available.");
-                break;
-            case MenuAction::Exit:
-                window.close();
-                break;
-            case MenuAction::None:
-                break;
+                application.handleEvent(*event, window);
+                if (!window.isOpen()) break;
             }
             if (!window.isOpen()) break;
-        }
-        if (!window.isOpen()) break;
 
-        menu.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
-        window.clear(sf::Color{ 18, 22, 31 });
-        menu.draw(window);
-        window.display();
+            application.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
+            window.clear(sf::Color{ 18, 22, 31 });
+            application.draw(window);
+            window.display();
+        }
+        return 0;
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "NXRP could not start: " << error.what() << '\n';
+        return 1;
     }
 }

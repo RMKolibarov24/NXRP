@@ -50,9 +50,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Maze.Logic.cpp" />
+    <ClCompile Include="Maze.Game.cpp" />
+    <ClCompile Include="Maze.Generation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Maze.Validation.h" />
+    <ClInclude Include="Maze.Game.h" />
+    <ClInclude Include="Maze.Generation.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Maze.Data\Maze.Data.vcxproj">
