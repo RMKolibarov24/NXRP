@@ -12,11 +12,17 @@
 Приложението е `build/bin/Debug/Maze.Graphics.exe`. Ресурсите от `assets/`
 се копират до него при build.
 
-The main menu has Continue, New Game, How to Play, Settings, and Exit. Continue
-is disabled without an active game. How to Play shows the maze rules. Settings
-lets you save or cancel row/column values from 10 to 50. Esc returns from those
-screens to the menu. Exit closes the window. New Game returns a menu action
-and currently reports that maze creation is unavailable; it does not start a game.
+The main menu has Continue, New Game, How to Play, Settings, and Exit.
+New Game starts the fixed 10x10 demo maze. Press an arrow key to move one cell;
+walls and boundaries block movement. The display shows the current row/column,
+blocked-move feedback, and victory at the green exit. Esc returns to the menu,
+and Continue resumes a paused game. Continue is disabled before a game and after
+victory. Exit closes the window.
+
+Settings saves separate row/column preferences from 10 to 50. The current demo
+always uses its fixed 10x10 map and preserves those preferences for future games.
+The renderer fits actual grids up to 50x50 when the window is resized. Random
+generation is not implemented yet.
 
 ## Проекти
 
@@ -83,8 +89,8 @@ throws `std::invalid_argument` before allocation. New cells are all `MazeCell::W
 `MazeSize` values can still hold invalid input for validation without allocating.
 
 `GameState` starts in the menu with an empty grid, a 10x10 selected size and a
-player position of (0,0). The GUI updates selectedSize through Settings. Maze
-generation and playable-game controls are not connected yet.
+player position of (0,0). The GUI updates selectedSize through Settings. Gameplay
+uses the actual maze dimensions; selectedSize remains the next-game preference.
 
 ## Gameplay logic
 
@@ -95,4 +101,6 @@ Invalid layouts throw before changing the existing game or the supplied grid.
 Movement uses the four directions, respects walls and boundaries, and reports
 Blocked, Moved or Won. Blocked requests leave the game unchanged; reaching the
 exit sets the Won phase. `createDemoMaze()` supplies a fixed, solvable 10x10 map
-for development. It is not random and is not connected to the GUI yet.
+for development. The GUI uses this map for New Game. `GameView` draws cells and
+the player from the data model and routes arrow-key events through `tryMove`.
+The map is fixed; random generation is a later addition.

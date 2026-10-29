@@ -57,9 +57,11 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="menu.cpp" />
+    <ClCompile Include="GameView.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="menu.h" />
+    <ClInclude Include="GameView.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Maze.Data\Maze.Data.vcxproj">

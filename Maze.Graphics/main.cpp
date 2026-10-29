@@ -1,8 +1,10 @@
 #include <SFML/Graphics.hpp>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 
-#include "GameState.h"
+#include "GameView.h"
+#include "Maze.Game.h"
 #include "Maze.Validation.h"
 #include "menu.h"
 
@@ -25,19 +27,26 @@ int main(int, char* argv[])
 
     GameState game;
     Menu menu(font);
-    const auto resize = [&window, &menu](sf::Vector2u size)
+    GameView gameView(font);
+    bool showingGame = false;
+    const auto canContinue = [&game] {
+        return game.hasActiveGame()
+            && (game.phase == GamePhase::Playing || game.phase == GamePhase::Paused);
+    };
+    const auto resize = [&window, &menu, &gameView](sf::Vector2u size)
     {
         if (size.x == 0 || size.y == 0) return;
         window.setView(sf::View(sf::FloatRect({ 0.f, 0.f }, {
             static_cast<float>(size.x), static_cast<float>(size.y)
         })));
         menu.resize(size);
+        gameView.resize(size);
     };
     resize(window.getSize());
 
     while (window.isOpen())
     {
-        menu.setHasActiveGame(game.hasActiveGame());
+        menu.setHasActiveGame(canContinue());
         while (const auto event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>())
@@ -47,6 +56,21 @@ int main(int, char* argv[])
             }
             if (const auto* resized = event->getIf<sf::Event::Resized>())
                 resize(resized->size);
+
+            if (showingGame)
+            {
+                const auto* key = event->getIf<sf::Event::KeyPressed>();
+                if (key && key->code == sf::Keyboard::Key::Escape)
+                {
+                    if (game.phase == GamePhase::Playing) game.phase = GamePhase::Paused;
+                    showingGame = false;
+                    menu.setHasActiveGame(canContinue());
+                    menu.showMain();
+                    window.setTitle("NXRP - Maze");
+                }
+                else gameView.handleEvent(*event, game);
+                continue;
+            }
 
             switch (menu.handleEvent(*event, window))
             {
@@ -65,15 +89,34 @@ int main(int, char* argv[])
                     game.selectedSize = menu.draftSize();
                     menu.showMain();
                     menu.showMessage("Saved size: " + std::to_string(game.selectedSize.rows)
-                        + " x " + std::to_string(game.selectedSize.cols) + ".");
+                        + " x " + std::to_string(game.selectedSize.cols) + ". Demo uses 10 x 10.");
                 }
                 break;
             case MenuAction::NewGame:
-                // The controller receives a request; no game is created yet.
-                menu.showMessage("Maze creation is not available yet.");
+                try
+                {
+                    const MazeSize selectedSize = game.selectedSize;
+                    startGame(game, createDemoMaze());
+                    // Keep the next-game preference separate from this fixed demo's size.
+                    game.selectedSize = selectedSize;
+                    gameView.reset();
+                    showingGame = true;
+                    window.setTitle("NXRP - Fixed 10x10 demo");
+                }
+                catch (const std::exception& error)
+                {
+                    menu.showMessage("Could not start the demo maze.");
+                    std::cerr << "Starting the demo failed: " << error.what() << '\n';
+                }
                 break;
             case MenuAction::Continue:
-                menu.showMessage("No playable game is available.");
+                if (canContinue())
+                {
+                    game.phase = GamePhase::Playing;
+                    gameView.reset();
+                    showingGame = true;
+                    window.setTitle("NXRP - Fixed 10x10 demo");
+                }
                 break;
             case MenuAction::Exit:
                 window.close();
@@ -85,9 +128,13 @@ int main(int, char* argv[])
         }
         if (!window.isOpen()) break;
 
-        menu.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
         window.clear(sf::Color{ 18, 22, 31 });
-        menu.draw(window);
+        if (showingGame) gameView.draw(window, game);
+        else
+        {
+            menu.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
+            menu.draw(window);
+        }
         window.display();
     }
 }
