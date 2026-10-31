@@ -1,0 +1,3 @@
+PASS: all main-menu actions, Settings Save/Cancel/Esc, help, paused-grid preservation and Continue.
+PASS: three complete generated games, both victory choices, victory Esc, disabled Continue and resized hit/hover bounds.
+Screen-flow verification passed.

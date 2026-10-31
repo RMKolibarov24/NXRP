@@ -1,0 +1,4 @@
+PASS: all main-menu actions, Settings Save/Cancel/Esc, help, paused-grid preservation and Continue.
+PASS: three complete generated games, both victory choices, victory Esc, disabled Continue and resized hit/hover bounds.
+PASS: actual 10x10/50x50 generated boards rendered at 900x600 and 640x560; close released both sessions.
+Screen-flow verification passed.
