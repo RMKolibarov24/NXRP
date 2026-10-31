@@ -68,8 +68,16 @@ starts another maze and **Main menu** returns to the menu. Continue is disabled
 after victory.
 
 Settings apply to the **next New Game**. Continue keeps the existing grid.
-At this version, settings and sessions live in memory and reset when the
-application closes. The board fits the window, including a 50 by 50 maze at
+Settings persist between launches in `%LOCALAPPDATA%\NXRP\settings.txt` for the
+current Windows user. **Save size** writes both dimensions. Missing, unreadable
+or malformed preferences use 10 by 10. If saving fails, the size still applies
+to New Game for this launch, and the menu explains that it could not save it.
+The file contains two integers: rows followed by columns. Both must be 10–50,
+with no extra data other than whitespace. Closing the game and deleting this
+specific file restores the defaults on the next launch. The maze and player
+position remain in memory only.
+
+The board fits the window, including a 50 by 50 maze at
 the minimum supported window size of 640 by 560.
 
 ## Projects and files
@@ -92,9 +100,9 @@ Build products, dependency downloads and `.vs/` caches stay ignored.
 
 ## Native unit tests
 
-Build the solution, then open **Test > Test Explorer > Run All**. The 63 tests
+Build the solution, then open **Test > Test Explorer > Run All**. The 75 tests
 belong to `MazeSizeTests`, `MazeGridTests`, `GameStateTests`,
-`MazeMovementTests`, `MazeGenerationTests` and `MazeSessionTests`.
+`MazeMovementTests`, `MazeGenerationTests`, `MazeSessionTests` and `MazeSettingsTests`.
 
 `Maze.UnitTest` is a **Native Unit Test Project** created in Visual Studio. It
 uses `CppUnitTest.h`, `TEST_CLASS`, `TEST_METHOD` and `Assert`. Its output is a
@@ -111,17 +119,19 @@ MSBuild NXRP.slnx /p:Configuration=Release /p:Platform=x64
 ```
 
 The suite checks ownership and bounds, movement and victory, session replacement,
+preference round-trips and malformed/unwritable files,
 fixed-seed repeatability and independently verified reachability for all 1,681
 allowed size pairs. [QA results](QA/README.md) distinguish CLI runs, UI observations
 and checks that remain unrun. [Final validation](docs/VALIDATION.md) records the
-documentation-stage rebuild and test results.
+documentation-stage rebuild and subsequent feature checks.
 
 ## Documentation
 
 - [Technical documentation](docs/TECHNICAL.md): architecture, data and memory,
   generation, movement, session lifecycle and test design.
 - [Algorithm diagrams](docs/ALGORITHMS.md): generation and movement flowcharts.
-- [Defense presentation](docs/NXRP_Defense.pptx): 10 editable slides with speaker notes.
+- [Defense presentation](docs/NXRP_Defense.pptx): 10 editable slides with speaker notes,
+  describing the completed base project at `44d251e`, before preference persistence.
 - [Presenter notes](docs/PRESENTATION_NOTES.md): slide notes and a short demonstration route.
 
 ## Troubleshooting
@@ -131,6 +141,7 @@ documentation-stage rebuild and test results.
 | Missing `NXRP.SFML.Debug.props` or SFML headers/libraries | Run the dependency preparation script for the chosen configuration. |
 | v145 toolset or native test framework missing | Modify the Visual Studio installation to include the C++ desktop toolchain and native test tools. |
 | Font fails to load at startup | Rebuild Maze.Graphics and keep the copied `assets/fonts/SourceSans3-Semibold.ttf` beside the executable. The console prints the failed path. |
+| Size applies only to this launch | Check write access to `%LOCALAPPDATA%\NXRP\`. The game keeps the chosen size in memory when saving fails. |
 | Tests do not appear | Build Maze.UnitTest in x64, check the C++ native test adapter, then reopen Test Explorer. The VSTest command above provides a separate diagnostic. |
 | `Set-Location` is not recognized | That command belongs to PowerShell. In Command Prompt use `cd /d` as shown above. |
 

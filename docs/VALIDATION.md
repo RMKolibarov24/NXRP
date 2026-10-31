@@ -1,5 +1,8 @@
 # Final local validation
 
+The original base-project validation below records `44d251e`. Feature-specific
+checks appear at the end and do not replace its archived evidence.
+
 Validation date: **31 October 2026**.
 Source baseline: `44d251e215951517147ecfbb09f292fb42eefa29` on `dev`.
 The documentation and QA additions do not change production code or native tests.
@@ -60,8 +63,45 @@ checks; the presentation was not opened in the native PowerPoint UI.
 - **QA-014:** first-time setup on a second clean Windows computer.
 - **QA-015:** test execution in the actual Visual Studio Test Explorer UI.
 - Opening the workbook in the native Excel UI remains unverified.
-- The game currently keeps preferences and the session only in memory. Closing
-  the process resets them. Seed entry, timer, move count, same-layout restart
-  and zoom remain outside this version's implemented interface.
+- At this base-project snapshot, preferences and the session lasted only in
+  memory. The preference-persistence check below records the subsequent change.
+  Seed entry, timer, move count, same-layout restart and zoom remain outside the
+  implemented interface.
 
 The documentation does not claim that the pending manual checks passed.
+
+## Persistent dimension preferences validation
+
+Date: **31 October 2026**. Tested source: `292dd1b` plus the preference-persistence
+working-tree changes, before their manual commit.
+
+| Configuration | Solution build | Native tests | New settings tests |
+| --- | --- | --- | --- |
+| Debug / x64 | Passed | 75 passed, 0 failed | 12 passed |
+| Release / x64 | Passed | 75 passed, 0 failed | 12 passed |
+
+The new Native Unit Test class covers loading/saving real isolated files,
+rectangular and boundary dimensions, whitespace, malformed/overflowed input,
+extra data, Unicode paths, automatic parent creation, replacement and write
+failures. Test files live in directories created by the fixture and never use
+the player's actual preferences.
+
+Five controller-probe modes ran as separate processes in both configurations.
+They exercised the real MazeApplication, menu and storage code through synthetic
+SFML events:
+
+- Save dimensions, then start a maze using those dimensions.
+- Save a different next-game size while paused. Continue preserves the old
+  allocation, every cell and the player's moved position.
+- Cancel and Escape discard drafts without changing the saved file.
+- A second process loads the saved size and uses it for New Game, while leaving
+  Continue unavailable until a game starts.
+- Invalid stored dimensions fall back without rewriting the input. A blocked
+  storage path or disabled persistence retains the size in memory and allows
+  New Game after the save failure.
+
+Saved/reloaded settings and the failure message were rendered and reviewed,
+including the 640 by 560 minimum window. These controller probes use hidden
+windows and offscreen renders; they do not replace the outstanding manual QA
+sweep or Test Explorer UI check. The original workbook, presentation and native
+reports above retain their base-project versions and results.

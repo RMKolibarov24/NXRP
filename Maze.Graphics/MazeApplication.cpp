@@ -1,14 +1,23 @@
 #include "MazeApplication.h"
 #include "Maze.Game.h"
 #include "Maze.Generation.h"
+#include "Maze.Settings.h"
 #include "Maze.Validation.h"
+#include "SettingsPath.h"
 
 #include <exception>
 #include <iostream>
+#include <utility>
 
 MazeApplication::MazeApplication(const sf::Font& font)
-    : menu_(font), gameView_(font)
+    : MazeApplication(font, settingsFilePath())
 {
+}
+
+MazeApplication::MazeApplication(const sf::Font& font, std::filesystem::path settingsPath)
+    : settingsPath_(std::move(settingsPath)), menu_(font), gameView_(font)
+{
+    game_.selectedSize = loadMazeSizePreferences(settingsPath_);
     showMainMenu();
 }
 
@@ -101,9 +110,18 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         if (isValidMazeSize(menu_.draftSize()))
         {
             game_.selectedSize = menu_.draftSize();
+            const bool saved = saveMazeSizePreferences(settingsPath_, game_.selectedSize);
             showMainMenu();
-            menu_.showMessage("Saved size: " + std::to_string(game_.selectedSize.rows)
-                + " x " + std::to_string(game_.selectedSize.cols) + ". Applies to New Game.");
+            if (saved)
+            {
+                menu_.showMessage("Saved size: " + std::to_string(game_.selectedSize.rows)
+                    + " x " + std::to_string(game_.selectedSize.cols) + ". Applies to New Game.");
+            }
+            else
+            {
+                menu_.showMessage("Size set for this launch only. Could not save preferences.");
+                std::cerr << "Could not save maze size preferences to: " << settingsPath_ << '\n';
+            }
         }
         break;
     case MenuAction::NewGame:

@@ -24,6 +24,9 @@
     <ClCompile Include="ExecutablePath.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SettingsPath.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="menu.h">
@@ -36,6 +39,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ExecutablePath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SettingsPath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

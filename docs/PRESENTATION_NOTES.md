@@ -1,5 +1,9 @@
 # Defense presenter notes
 
+Version note: this presentation records the completed base project at `44d251e`,
+before persistent dimension preferences. The current implementation and added
+settings tests are described in `TECHNICAL.md` and `VALIDATION.md`.
+
 The 10-slide presentation describes the implemented C++17 Windows application.
 Each slide also contains these notes in its PowerPoint speaker-notes pane.
 Allow about 6–8 minutes plus questions. All named sources are repository files.

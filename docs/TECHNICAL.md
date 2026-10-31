@@ -27,6 +27,8 @@ no circular project references.
 | `GameView` | Translate arrow events into logic calls, draw cells/player and show movement feedback. |
 | `Maze.Game` | Start/end sessions, validate prepared layouts, apply movement and detect victory. |
 | `Maze.Generation` | Create a connected random grid with an optional test seed. |
+| `Maze.Settings` | Load/save validated next-game dimensions through a supplied filesystem path. |
+| `SettingsPath` | Resolve the current Windows user's local app-data settings path. |
 | `MazeGrid` | Own the dynamic cell array and provide checked access. |
 
 The event loop polls available events, stops if the window closes, updates the
@@ -136,7 +138,7 @@ or validation errors therefore preserve the old session and show an error messag
 | Escape during play | Set Paused and show the main menu. Keep the grid and player. |
 | Continue | Enter Playing with the same grid/player. Available only for an unfinished Playing/Paused session. |
 | Help or Settings | Display a menu page while preserving the paused session. |
-| Save size | Validate and store the next-game dimensions in memory. Keep the current grid. |
+| Save size | Validate and store the next-game dimensions in memory and the user's settings file. Keep the current grid. On a write failure, keep the size for this launch and show a message. |
 | Back/Escape from Settings | Discard the draft by returning without applying it. |
 | Reach the exit | Set Won and display the Victory page. Continue becomes unavailable. |
 | Main menu after victory | Show the menu while retaining Won and its completed grid until replacement or exit. |
@@ -146,6 +148,36 @@ or validation errors therefore preserve the old session and show an error messag
 controller's `canContinue()` additionally checks the phase, so a completed maze
 does not enable Continue. Menu page selection and GamePhase serve different
 purposes and should not be treated as interchangeable state machines.
+
+## Persistent dimension preferences
+
+MazeApplication loads the next-game size once during construction. Its default
+constructor obtains `%LOCALAPPDATA%\NXRP\settings.txt` through the Windows
+`SHGetKnownFolderPath(FOLDERID_LocalAppData)` API. The returned Unicode buffer
+has RAII ownership and uses `CoTaskMemFree` for cleanup. Failure to resolve the
+folder disables persistence and leaves the default size available. A second
+constructor accepts an explicit path for isolated controller checks.
+
+Maze.Settings uses standard C++ file streams and filesystem operations, keeping
+SFML and Windows path lookup out of Logic. The format is two whitespace-separated
+integers, rows and columns. The loader rejects missing/overflowed numbers,
+dimensions outside 10–50 and trailing non-whitespace data. Missing or unreadable
+files also return the 10 by 10 default. Loading does not create or rewrite files.
+
+Save size updates the next-game preference and writes a temporary sibling file.
+Only after closing a complete file does it rename the replacement over the old
+preferences. Invalid dimensions are rejected before any filesystem mutation.
+Directory, write and rename failures return false. MazeApplication keeps the
+in-memory size and explains that it applies to this launch only. Back/Escape
+discards the Settings draft without writing. Continue never reloads preferences
+or resizes the paused grid. New Game uses the current in-memory selection.
+
+The application saves preferences, rather than a game session. The user can
+reset dimensions by closing the game and deleting only its settings.txt file.
+The file lives outside the checkout and does not belong in Git.
+
+API references: [Windows known-folder lookup](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath),
+[C++ filesystem operations](https://learn.microsoft.com/en-us/cpp/standard-library/filesystem-functions?view=msvc-170).
 
 ## Rendering and resources
 
@@ -171,7 +203,7 @@ Visual Studio template's PCH and warning level 3. All configurations target x64.
 SFML builds statically through `Prepare-Dependencies.ps1`; generated property
 sheets provide its headers, libraries and `SFML_STATIC` definition to Graphics.
 
-The native DLL contains 63 tests in six classes:
+The native DLL contains 75 tests in seven classes:
 
 | Class | Tests | Coverage |
 | --- | ---: | --- |
@@ -181,6 +213,7 @@ The native DLL contains 63 tests in six classes:
 | MazeMovementTests | 20 | Directions, walls/bounds, invalid state, prepared layout validation and victory. |
 | MazeGenerationTests | 11 | Connectivity, seeds, even/odd sizes, invalid input and playable routes. |
 | MazeSessionTests | 6 | Repeated sessions, endGame, replacement failure and preference preservation. |
+| MazeSettingsTests | 12 | Valid/invalid files, whitespace, Unicode paths, replacement, missing directories and write failures. |
 
 Generation tests use an independent one-cell BFS rather than the generator's
 two-cell DFS. They check that every walkable cell is reachable and follow found
@@ -199,8 +232,8 @@ See [validation](VALIDATION.md) for the final local checks and limitations.
 
 The current application includes the five-option graphical menu, random connected
 mazes, dimension controls, arrow movement, blocked feedback, pause/Continue,
-victory and safe session replacement. Current settings and gameplay state last
-only for the process lifetime. Seed input/replay, elapsed time, move counters,
+victory, safe session replacement and persistent dimension preferences. Gameplay
+state lasts only for the process lifetime. Seed input/replay, elapsed time, move counters,
 restart of the same layout and zoom are not exposed in this version.
 
 The remaining QA cases are a complete manual hover/click sweep, a clean
