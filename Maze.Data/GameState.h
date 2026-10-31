@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MazeGrid.h"
+#include "GameStatistics.h"
 #include "MazePosition.h"
 
 enum class GamePhase
@@ -17,6 +18,7 @@ struct GameState
     MazeSize selectedSize{ MIN_MAZE_SIZE, MIN_MAZE_SIZE };
     MazePosition player;
     GamePhase phase = GamePhase::Menu;
+    GameStatistics statistics;
 
     bool hasActiveGame() const noexcept
     {

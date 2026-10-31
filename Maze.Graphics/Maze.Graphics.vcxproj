@@ -64,6 +64,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="menu.cpp" />
     <ClCompile Include="GameView.cpp" />
+    <ClCompile Include="GameStatisticsText.cpp" />
     <ClCompile Include="MazeApplication.cpp" />
     <ClCompile Include="ExecutablePath.cpp" />
     <ClCompile Include="SettingsPath.cpp" />
@@ -71,6 +72,7 @@
   <ItemGroup>
     <ClInclude Include="menu.h" />
     <ClInclude Include="GameView.h" />
+    <ClInclude Include="GameStatisticsText.h" />
     <ClInclude Include="MazeApplication.h" />
     <ClInclude Include="ExecutablePath.h" />
     <ClInclude Include="SettingsPath.h" />

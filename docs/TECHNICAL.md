@@ -49,6 +49,8 @@ Passage and Exit. `GameState` contains:
 - A selected size, initially 10 by 10, used for the next game.
 - A player position, initially `(0, 0)`.
 - A GamePhase: Menu, Playing, Paused or Won.
+- GameStatistics containing an elapsed steady-clock duration and a 64-bit
+  unsigned successful-move count, both initially zero.
 
 MazeGrid represents a two-dimensional grid with one **contiguous dynamic array**:
 
@@ -135,7 +137,7 @@ or validation errors therefore preserve the old session and show an error messag
 | Action | State and ownership behavior |
 | --- | --- |
 | New Game | Prepare/validate a replacement, release the previous owned grid on successful assignment, reset player to `(0, 0)` and enter Playing. |
-| Restart maze / R | Reset the existing session's player to `(0, 0)` and enter Playing. Keep every cell, the grid allocation and the selected next-game size. |
+| Restart maze / R | Reset player and statistics, then enter Playing. Keep every cell, the grid allocation and the selected next-game size. |
 | Escape during play | Set Paused and show the main menu. Keep the grid and player. |
 | Continue | Enter Playing with the same grid/player. Available only for an unfinished Playing/Paused session. |
 | Help or Settings | Display a menu page while preserving the paused session. |
@@ -163,6 +165,32 @@ Settings has no effect, preserving a Settings draft until Save or Cancel.
 The restart button remains disabled until a session exists. A completed maze
 can restart even though Continue is disabled. New Game still uses the selected
 dimensions and calls the random generator.
+
+## Game time and successful moves
+
+GameStatistics belongs to GameState in Data. Logic increments successfulMoves
+only after accepting and applying a move, including the winning step. Blocked
+requests preserve it. Successful startGame, restartGame and endGame reset both
+statistics. A rejected layout or rejected restart preserves the previous values.
+
+`advanceGameTime(game, duration)` adds positive durations only while the grid is
+nonempty and the phase is Playing. It never reads a clock, allowing deterministic
+native tests with exact durations. Fractional seconds remain in the model. Time
+and move counts saturate at their representable maxima instead of wrapping.
+
+MazeApplication reads `std::chrono::steady_clock` before each event and update.
+It charges the interval to the old phase before applying an action. Escape
+therefore records time up to pausing; Continue discards the paused interval
+before returning to Playing. A winning movement records time up to that event,
+then the Won phase stops further accumulation. Equal or earlier timestamps do
+not add time or move the clock anchor backwards. Constructor, event and update
+methods accept explicit timestamps for isolated controller verification.
+
+GameView displays a statistics line between player coordinates and movement
+feedback. Menu takes a snapshot of the final values when showing Victory.
+GameStatisticsText formats total minutes and seconds as MM:SS and the move count.
+Only display formatting discards fractional seconds. Statistics remain in memory
+for the current session and are not written to the dimension-preference file.
 
 ## Persistent dimension preferences
 
@@ -218,7 +246,7 @@ Visual Studio template's PCH and warning level 3. All configurations target x64.
 SFML builds statically through `Prepare-Dependencies.ps1`; generated property
 sheets provide its headers, libraries and `SFML_STATIC` definition to Graphics.
 
-The native DLL contains 81 tests in seven classes:
+The native DLL contains 91 tests in eight classes:
 
 | Class | Tests | Coverage |
 | --- | ---: | --- |
@@ -229,6 +257,7 @@ The native DLL contains 81 tests in seven classes:
 | MazeGenerationTests | 11 | Connectivity, seeds, even/odd sizes, invalid input and playable routes. |
 | MazeSessionTests | 12 | Repeated sessions, endGame, replacement failure, same-maze restart and preference preservation. |
 | MazeSettingsTests | 12 | Valid/invalid files, whitespace, Unicode paths, replacement, missing directories and write failures. |
+| GameStatisticsTests | 10 | Active/paused/victory time, accepted moves, reset/failure semantics, fractional time and saturation. |
 
 Generation tests use an independent one-cell BFS rather than the generator's
 two-cell DFS. They check that every walkable cell is reachable and follow found
@@ -248,8 +277,8 @@ See [validation](VALIDATION.md) for the final local checks and limitations.
 The current application includes the six-option graphical menu, random connected
 mazes, dimension controls, arrow movement, blocked feedback, pause/Continue,
 victory, same-maze restart, safe session replacement and persistent dimension
-preferences. Gameplay state lasts only for the process lifetime. Seed input/replay,
-elapsed time, move counters and zoom are not exposed in this version.
+preferences, elapsed time and successful-move counts. Gameplay state lasts only
+for the process lifetime. Seed input/replay and zoom are not exposed in this version.
 
 The remaining QA cases are a complete manual hover/click sweep, a clean
 second-machine setup, and execution inside Visual Studio Test Explorer. The

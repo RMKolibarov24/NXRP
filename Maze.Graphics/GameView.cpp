@@ -1,5 +1,6 @@
 #include "GameView.h"
 #include "Maze.Game.h"
+#include "GameStatisticsText.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,13 +25,14 @@ namespace
 
 GameView::GameView(const sf::Font& font)
     : title_(font, "MAZE", 30), controls_(font, "", 18),
-      legend_(font, "", 17), position_(font, "", 22), message_(font, "", 20),
+      legend_(font, "", 17), position_(font, "", 22), statistics_(font, "", 22), message_(font, "", 20),
       cellLabel_(font, "", 16)
 {
     title_.setFillColor(textColor);
     controls_.setFillColor(mutedColor);
     legend_.setFillColor(textColor);
     position_.setFillColor(textColor);
+    statistics_.setFillColor(textColor);
     cellLabel_.setFillColor({ 18, 22, 31 });
     reset();
 }
@@ -95,8 +97,11 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
 
     position_.setString("Row " + std::to_string(game.player.row)
         + "  |  Column " + std::to_string(game.player.col));
-    position_.setPosition({ 24.f, height - 86.f });
+    position_.setPosition({ 24.f, height - 116.f });
     target.draw(position_);
+    statistics_.setString(gameStatisticsText(game.statistics));
+    statistics_.setPosition({ 24.f, height - 85.f });
+    target.draw(statistics_);
     const bool won = game.phase == GamePhase::Won;
     message_.setString(won ? "You reached the exit! Esc returns to the menu." : notice_);
     message_.setFillColor(won ? exitColor : mutedColor);
@@ -107,7 +112,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     const auto& size = game.maze.size();
     const float rows = static_cast<float>(size.rows);
     const float cols = static_cast<float>(size.cols);
-    const float availableHeight = std::max(0.f, height - 220.f);
+    const float availableHeight = std::max(0.f, height - 250.f);
     const float cellSize = std::floor(std::min(std::max(0.f, width - 48.f) / cols,
         availableHeight / rows));
     if (cellSize < 2.f) return;

@@ -79,6 +79,12 @@ with no extra data other than whitespace. Closing the game and deleting this
 specific file restores the defaults on the next launch. The maze and player
 position remain in memory only.
 
+The game display shows elapsed time and successful moves. Time runs only while
+Playing, pauses across the main menu/Help/Settings, and freezes when the exit is
+reached. The victory page shows the final results. Blocked requests do not add
+moves; the winning step counts once. New Game and Restart reset both statistics,
+while Continue preserves them. Time uses total minutes and two-digit seconds.
+
 The board fits the window, including a 50 by 50 maze at
 the minimum supported window size of 640 by 560.
 
@@ -102,9 +108,10 @@ Build products, dependency downloads and `.vs/` caches stay ignored.
 
 ## Native unit tests
 
-Build the solution, then open **Test > Test Explorer > Run All**. The 81 tests
+Build the solution, then open **Test > Test Explorer > Run All**. The 91 tests
 belong to `MazeSizeTests`, `MazeGridTests`, `GameStateTests`,
-`MazeMovementTests`, `MazeGenerationTests`, `MazeSessionTests` and `MazeSettingsTests`.
+`MazeMovementTests`, `MazeGenerationTests`, `MazeSessionTests`, `MazeSettingsTests`
+and `GameStatisticsTests`.
 
 `Maze.UnitTest` is a **Native Unit Test Project** created in Visual Studio. It
 uses `CppUnitTest.h`, `TEST_CLASS`, `TEST_METHOD` and `Assert`. Its output is a
@@ -121,7 +128,7 @@ MSBuild NXRP.slnx /p:Configuration=Release /p:Platform=x64
 ```
 
 The suite checks ownership and bounds, movement and victory, session replacement/restart,
-preference round-trips and malformed/unwritable files,
+preference round-trips, malformed/unwritable files, game time and successful moves,
 fixed-seed repeatability and independently verified reachability for all 1,681
 allowed size pairs. [QA results](QA/README.md) distinguish CLI runs, UI observations
 and checks that remain unrun. [Final validation](docs/VALIDATION.md) records the

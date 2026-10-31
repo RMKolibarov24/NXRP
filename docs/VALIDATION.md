@@ -143,3 +143,39 @@ Main-menu, Help, restarted-board and Victory renders were reviewed, including
 disabled controls, restart hover state and the minimum-window layout. These
 synthetic-event and render checks remain distinct from the outstanding manual
 QA sweep and actual Test Explorer UI execution.
+
+## Game statistics validation
+
+Date: **31 October 2026**. Tested source: `f5baa28` plus the game-statistics
+working-tree changes, before their manual commit.
+
+| Configuration | Solution build | Native tests | Added statistics tests |
+| --- | --- | --- | --- |
+| Debug / x64 | Passed | 91 passed, 0 failed | 10 passed |
+| Release / x64 | Passed | 91 passed, 0 failed | 10 passed |
+
+GameStatisticsTests covers zero initialization, accepted and blocked movement,
+the winning step, fractional elapsed time, inactive/empty sessions, nonpositive
+durations, reset operations, rejection preservation and numeric saturation.
+Existing state, movement and session tests also check the added fields.
+
+Controller checks injected exact monotonic timestamps through the real
+MazeApplication and used synthetic mouse/key events with hidden windows. Both
+configurations checked a 10 by 10 maze at 900 by 600 and a 50 by 50 maze at
+640 by 560. No waiting or real-time tolerances were needed. The checks verified:
+
+- Time records the interval before Escape, remains unchanged across the main
+  menu/Help/Settings, and excludes the entire paused interval on Continue.
+- Subsecond time survives pause/resume. Repeated or earlier timestamps neither
+  add time nor shift the clock anchor backwards.
+- Blocked requests do not add moves. Legal steps and the final exit step do.
+- An independent BFS route reaches victory with the exact route-length move
+  count and expected accumulated time. Later updates, keys and resize events
+  leave those results frozen. Before/after victory renders match pixel for pixel.
+- New Game, Restart and Exit clear both statistics. Continue preserves them.
+  The saved dimension file remains unchanged by statistics and cancelled drafts.
+
+The shared text formatter was checked at zero, fractional seconds, a minute
+boundary and one hour. The updated game display and Victory page were rendered
+and reviewed at both sizes. These engine/controller checks do not claim completion
+of the outstanding manual QA sweep or native Test Explorer UI check.

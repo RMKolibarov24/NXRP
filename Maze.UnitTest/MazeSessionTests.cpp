@@ -41,6 +41,8 @@ namespace MazeUnitTest
             Assert::AreEqual(0, game.player.col);
             Assert::IsTrue(game.phase == GamePhase::Menu);
             Assert::IsFalse(hasWon(game));
+            Assert::IsTrue(game.statistics.elapsed == std::chrono::steady_clock::duration::zero());
+            Assert::IsTrue(game.statistics.successfulMoves == 0);
         }
     }
 

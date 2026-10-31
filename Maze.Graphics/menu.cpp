@@ -1,5 +1,6 @@
 #include "menu.h"
 #include "Maze.Validation.h"
+#include "GameStatisticsText.h"
 
 #include <algorithm>
 #include <cmath>
@@ -91,6 +92,7 @@ void Menu::Button::draw(sf::RenderTarget& target) const
 Menu::Menu(const sf::Font& font)
     : font_(font), title_(font, "", 42), subtitle_(font, "", 19),
       rules_(font, "", 20), message_(font, "", 18), victorySummary_(font, "", 24),
+      victoryStatistics_(font, "", 22),
       rowName_(font, "Rows", 24), colName_(font, "Columns", 24),
       rowValue_(font, "", 28), colValue_(font, "", 28), sizeSummary_(font, "", 19),
       mainButtons_{
@@ -110,7 +112,7 @@ Menu::Menu(const sf::Font& font)
 {
     for (auto* text : { &title_, &rules_, &victorySummary_, &rowName_, &colName_, &rowValue_, &colValue_ })
         text->setFillColor(textColor);
-    for (auto* text : { &subtitle_, &message_, &sizeSummary_ })
+    for (auto* text : { &subtitle_, &message_, &sizeSummary_, &victoryStatistics_ })
         text->setFillColor(mutedColor);
     rules_.setLineSpacing(1.3f);
     showMain();
@@ -138,6 +140,7 @@ void Menu::resize(sf::Vector2u size)
     message_.setString(wrapText(notice_, font_, 18, width - 80.f));
     centerText(message_, { center, height - 45.f });
     centerText(victorySummary_, { center, std::floor(height / 2.f - 100.f) });
+    centerText(victoryStatistics_, { center, std::floor(height / 2.f - 64.f) });
     rules_.setString(wrapText(
         "Start in the top-left corner.\n"
         "Reach the green exit at the bottom-right.\n"
@@ -229,7 +232,7 @@ void Menu::showMessage(const std::string& message)
     resize(viewport_);
 }
 
-void Menu::showVictory(const MazeSize& completedSize)
+void Menu::showVictory(const MazeSize& completedSize, const GameStatistics& statistics)
 {
     if (!isValidMazeSize(completedSize))
         throw std::invalid_argument("Victory requires valid completed maze dimensions.");
@@ -238,6 +241,7 @@ void Menu::showVictory(const MazeSize& completedSize)
     subtitle_.setString("The maze is complete.");
     victorySummary_.setString("Maze completed: " + std::to_string(completedSize.rows)
         + " x " + std::to_string(completedSize.cols));
+    victoryStatistics_.setString(gameStatisticsText(statistics));
     notice_ = "R restarts this maze. Esc returns to the main menu.";
     resize(viewport_);
 }
@@ -338,6 +342,7 @@ void Menu::draw(sf::RenderTarget& target) const
         else if (screen_ == Screen::Victory)
         {
             target.draw(victorySummary_);
+            target.draw(victoryStatistics_);
             mainButtons_[1].draw(target);
             mainButtons_[2].draw(target);
             target.draw(message_);

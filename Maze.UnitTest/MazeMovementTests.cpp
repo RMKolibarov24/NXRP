@@ -41,6 +41,7 @@ namespace MazeUnitTest
         {
             const auto player = game.player;
             const auto phase = game.phase;
+            const auto statistics = game.statistics;
             const auto selected = game.selectedSize;
             const auto size = game.maze.size();
             const auto count = game.maze.cellCount();
@@ -50,6 +51,8 @@ namespace MazeUnitTest
             Assert::IsTrue(tryMove(game, direction) == MoveResult::Blocked, L"Expected a blocked move.");
             AssertPosition(player, game.player);
             Assert::IsTrue(game.phase == phase, L"Blocked movement changed the game phase.");
+            Assert::IsTrue(game.statistics.elapsed == statistics.elapsed);
+            Assert::IsTrue(game.statistics.successfulMoves == statistics.successfulMoves);
             Assert::AreEqual(selected.rows, game.selectedSize.rows);
             Assert::AreEqual(selected.cols, game.selectedSize.cols);
             Assert::AreEqual(size.rows, game.maze.size().rows);

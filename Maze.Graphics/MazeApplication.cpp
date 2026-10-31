@@ -14,8 +14,9 @@ MazeApplication::MazeApplication(const sf::Font& font)
 {
 }
 
-MazeApplication::MazeApplication(const sf::Font& font, std::filesystem::path settingsPath)
-    : settingsPath_(std::move(settingsPath)), menu_(font), gameView_(font)
+MazeApplication::MazeApplication(const sf::Font& font, std::filesystem::path settingsPath,
+    Clock::time_point now)
+    : settingsPath_(std::move(settingsPath)), previousTick_(now), menu_(font), gameView_(font)
 {
     game_.selectedSize = loadMazeSizePreferences(settingsPath_);
     showMainMenu();
@@ -70,8 +71,18 @@ void MazeApplication::restartCurrentGame()
     if (restartGame(game_)) gameView_.reset();
 }
 
-void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& window)
+void MazeApplication::updateTime(Clock::time_point now)
 {
+    if (now <= previousTick_) return;
+    advanceGameTime(game_, now - previousTick_);
+    previousTick_ = now;
+}
+
+void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& window,
+    Clock::time_point now)
+{
+    // Account for time in the old phase before an event pauses, resumes or wins.
+    updateTime(now);
     if (event.is<sf::Event::Closed>())
     {
         endGame(game_);
@@ -102,7 +113,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
             {
                 menu_.setHasActiveGame(false);
                 menu_.setCanRestart(canRestart());
-                menu_.showVictory(game_.maze.size());
+                menu_.showVictory(game_.maze.size(), game_.statistics);
             }
         }
         return;
@@ -159,8 +170,9 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
     }
 }
 
-void MazeApplication::update(sf::Vector2f mousePosition)
+void MazeApplication::update(sf::Vector2f mousePosition, Clock::time_point now)
 {
+    updateTime(now);
     if (game_.phase != GamePhase::Playing) menu_.update(mousePosition);
 }
 

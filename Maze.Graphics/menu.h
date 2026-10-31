@@ -5,6 +5,7 @@
 #include <string>
 
 #include "MazeSize.h"
+#include "GameStatistics.h"
 
 enum class MenuAction
 {
@@ -30,7 +31,7 @@ public:
     void showMain();
     void showHowToPlay();
     void showSettings(const MazeSize& selectedSize);
-    void showVictory(const MazeSize& completedSize);
+    void showVictory(const MazeSize& completedSize, const GameStatistics& statistics);
     void showMessage(const std::string& message);
     MazeSize draftSize() const noexcept;
 
@@ -70,6 +71,7 @@ private:
     sf::Text rules_;
     sf::Text message_;
     sf::Text victorySummary_;
+    sf::Text victoryStatistics_;
     sf::Text rowName_;
     sf::Text colName_;
     sf::Text rowValue_;

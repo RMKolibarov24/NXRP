@@ -22,6 +22,7 @@ private:
     sf::Text controls_;
     sf::Text legend_;
     sf::Text position_;
+    sf::Text statistics_;
     sf::Text message_;
     sf::Text cellLabel_;
     sf::VertexArray cells_{ sf::PrimitiveType::Triangles };
