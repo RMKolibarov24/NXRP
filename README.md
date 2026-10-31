@@ -58,14 +58,16 @@ build\bin\Debug\Maze.Graphics.exe
 | Escape during play | Pause and open the main menu. |
 | Continue | Resume the same maze and position. Available only for an unfinished session. |
 | New Game | Generate a maze using the selected dimensions and start at `(0, 0)`. Replaces any previous session. |
+| Restart maze / R | Start the same maze again at `(0, 0)`. Available during play, from the main menu and after victory. Keeps its layout and the next-game size. R is ignored on Help and Settings pages. |
 | How to Play | Show the rules. Back or Escape returns to the main menu. |
 | Settings | Use the separate row/column minus/plus controls, then **Save size**. Back or Escape discards the draft. |
 | Exit or window close | Release the current maze and close the application. |
 
 The yellow player starts at the top-left passage. The green exit is at
-`(rows - 1, columns - 1)`. Reaching it opens the victory page, where **New Game**
-starts another maze and **Main menu** returns to the menu. Continue is disabled
-after victory.
+`(rows - 1, columns - 1)`. Reaching it opens the victory page, where **Restart maze**
+replays the same layout, **New Game** generates another maze and **Main menu**
+returns to the menu. Continue is disabled after victory. Restart maze is disabled
+until a session exists, and it becomes available again for a completed maze.
 
 Settings apply to the **next New Game**. Continue keeps the existing grid.
 Settings persist between launches in `%LOCALAPPDATA%\NXRP\settings.txt` for the
@@ -100,7 +102,7 @@ Build products, dependency downloads and `.vs/` caches stay ignored.
 
 ## Native unit tests
 
-Build the solution, then open **Test > Test Explorer > Run All**. The 75 tests
+Build the solution, then open **Test > Test Explorer > Run All**. The 81 tests
 belong to `MazeSizeTests`, `MazeGridTests`, `GameStateTests`,
 `MazeMovementTests`, `MazeGenerationTests`, `MazeSessionTests` and `MazeSettingsTests`.
 
@@ -118,7 +120,7 @@ MSBuild NXRP.slnx /p:Configuration=Release /p:Platform=x64
 "%VSINSTALLDIR%Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe" build\bin\Release\Maze.UnitTest.dll /Platform:x64 /Logger:trx /ResultsDirectory:build\TestResults\Release
 ```
 
-The suite checks ownership and bounds, movement and victory, session replacement,
+The suite checks ownership and bounds, movement and victory, session replacement/restart,
 preference round-trips and malformed/unwritable files,
 fixed-seed repeatability and independently verified reachability for all 1,681
 allowed size pairs. [QA results](QA/README.md) distinguish CLI runs, UI observations

@@ -74,7 +74,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     const float height = static_cast<float>(viewport_.y);
     title_.setPosition({ 24.f, 14.f });
     controls_.setString(std::to_string(game.maze.size().rows) + " x "
-        + std::to_string(game.maze.size().cols) + "  |  Arrow keys: move  |  Esc: menu");
+        + std::to_string(game.maze.size().cols) + "  |  Arrow keys: move  |  R: restart  |  Esc: menu");
     controls_.setPosition({ 24.f, 56.f });
     target.draw(title_);
     target.draw(controls_);

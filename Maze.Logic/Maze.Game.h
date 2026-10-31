@@ -26,6 +26,11 @@ MazeGrid createDemoMaze();
 // before changing either the game or preparedMaze. Reachability is not checked.
 void startGame(GameState& game, MazeGrid&& preparedMaze);
 
+// Restarts a Playing, Paused or Won session at (0,0) without replacing its grid.
+// Uses the existing layout already validated by startGame.
+// Preserves the next-game size. Returns false without changes if no session exists.
+bool restartGame(GameState& game) noexcept;
+
 // Releases maze data and resets the player/phase, preserving the next-game size.
 // Safe when already empty; performs no allocation.
 void endGame(GameState& game) noexcept;

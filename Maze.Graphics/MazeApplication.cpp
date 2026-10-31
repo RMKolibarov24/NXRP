@@ -38,10 +38,16 @@ bool MazeApplication::canContinue() const noexcept
         && (game_.phase == GamePhase::Playing || game_.phase == GamePhase::Paused);
 }
 
+bool MazeApplication::canRestart() const noexcept
+{
+    return canContinue() || (game_.hasActiveGame() && game_.phase == GamePhase::Won);
+}
+
 void MazeApplication::showMainMenu()
 {
     if (game_.phase == GamePhase::Playing) game_.phase = GamePhase::Paused;
     menu_.setHasActiveGame(canContinue());
+    menu_.setCanRestart(canRestart());
     menu_.showMain();
 }
 
@@ -57,6 +63,11 @@ void MazeApplication::beginNewGame()
         menu_.showMessage("Could not start a new maze. Please try again.");
         std::cerr << "Starting a new maze failed: " << error.what() << '\n';
     }
+}
+
+void MazeApplication::restartCurrentGame()
+{
+    if (restartGame(game_)) gameView_.reset();
 }
 
 void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& window)
@@ -83,12 +94,14 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
     {
         const auto* key = event.getIf<sf::Event::KeyPressed>();
         if (key && key->code == sf::Keyboard::Key::Escape) showMainMenu();
+        else if (key && key->code == sf::Keyboard::Key::R) restartCurrentGame();
         else
         {
             gameView_.handleEvent(event, game_);
             if (game_.phase == GamePhase::Won)
             {
                 menu_.setHasActiveGame(false);
+                menu_.setCanRestart(canRestart());
                 menu_.showVictory(game_.maze.size());
             }
         }
@@ -126,6 +139,9 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         break;
     case MenuAction::NewGame:
         beginNewGame();
+        break;
+    case MenuAction::RestartMaze:
+        restartCurrentGame();
         break;
     case MenuAction::Continue:
         if (canContinue())

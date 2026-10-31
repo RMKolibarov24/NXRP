@@ -20,8 +20,10 @@ public:
 
 private:
     bool canContinue() const noexcept;
+    bool canRestart() const noexcept;
     void showMainMenu();
     void beginNewGame();
+    void restartCurrentGame();
 
     GameState game_;
     std::filesystem::path settingsPath_;

@@ -105,3 +105,41 @@ including the 640 by 560 minimum window. These controller probes use hidden
 windows and offscreen renders; they do not replace the outstanding manual QA
 sweep or Test Explorer UI check. The original workbook, presentation and native
 reports above retain their base-project versions and results.
+
+## Same-maze restart validation
+
+Date: **31 October 2026**. Tested source: `88b5c29` plus the same-maze restart
+working-tree changes, before their manual commit.
+
+| Configuration | Solution build | Native tests | Added restart tests |
+| --- | --- | --- | --- |
+| Debug / x64 | Passed | 81 passed, 0 failed | 6 passed |
+| Release / x64 | Passed | 81 passed, 0 failed | 6 passed |
+
+The added MazeSessionTests cases cover restart from Playing, Paused and Won,
+repeated completion/restart, rejection without a started session, preservation
+of every grid cell and its allocation, and preservation of the next-game size.
+Minimum, maximum and rectangular grids retain their dimensions and layout.
+
+Controller probes ran against the real application code in both configurations,
+using isolated settings files and hidden windows. Each configuration checked a
+10 by 10 maze at 900 by 600 and a 50 by 50 maze at 640 by 560. Independent BFS
+routes exercised repeated victory transitions through real arrow-key events.
+The probes confirmed:
+
+- R restarts during play, from the paused main menu and on the Victory page.
+- Restart maze works from the main menu, after returning from victory, and
+  directly on the Victory page.
+- Restart keeps the cell allocation and complete layout, resets position/phase
+  and movement feedback, and leaves saved next-game preferences unchanged.
+- Continue and Restart maze are unavailable before the first game. After
+  victory, Continue remains unavailable while Restart maze is available.
+- R on Help and Settings leaves the paused game and Settings draft intact.
+  Cancelling the draft leaves the saved preference file unchanged.
+- New Game still uses the selected dimensions. All three victory buttons route
+  to their intended actions, and Exit releases the session.
+
+Main-menu, Help, restarted-board and Victory renders were reviewed, including
+disabled controls, restart hover state and the minimum-window layout. These
+synthetic-event and render checks remain distinct from the outstanding manual
+QA sweep and actual Test Explorer UI execution.

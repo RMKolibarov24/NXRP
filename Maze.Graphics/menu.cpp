@@ -96,6 +96,7 @@ Menu::Menu(const sf::Font& font)
       mainButtons_{
           Button(font, "Continue", MenuAction::Continue),
           Button(font, "New Game", MenuAction::NewGame),
+          Button(font, "Restart maze", MenuAction::RestartMaze),
           Button(font, "How to Play", MenuAction::HowToPlay),
           Button(font, "Settings", MenuAction::Settings),
           Button(font, "Exit", MenuAction::Exit)
@@ -127,9 +128,11 @@ void Menu::resize(sf::Vector2u size)
     centerText(subtitle_, { center, 103.f });
 
     const float buttonWidth = std::min(320.f, width - 80.f);
-    const float top = std::max(140.f, (height - 288.f) / 2.f + 20.f);
+    constexpr float buttonStep = 54.f;
+    const float mainHeight = buttonStep * static_cast<float>(mainButtons_.size() - 1) + 48.f;
+    const float top = std::max(144.f, (height - mainHeight) / 2.f + 16.f);
     for (std::size_t index = 0; index < mainButtons_.size(); ++index)
-        mainButtons_[index].setBounds({ center - buttonWidth / 2.f, top + 60.f * static_cast<float>(index) },
+        mainButtons_[index].setBounds({ center - buttonWidth / 2.f, top + buttonStep * static_cast<float>(index) },
             { buttonWidth, 48.f });
 
     message_.setString(wrapText(notice_, font_, 18, width - 80.f));
@@ -141,8 +144,9 @@ void Menu::resize(sf::Vector2u size)
         "Arrow keys move one cell at a time.\n"
         "Walls and maze edges block movement.\n"
         "Esc opens the menu; Continue resumes the same game.\n"
+        "R restarts the same maze at the start.\n"
         "Choose rows and columns (10-50) in Settings.\n"
-        "After winning, choose New Game or Main menu.", font_, 20, width - 112.f));
+        "After winning: Restart maze, New Game or Main menu.", font_, 20, width - 112.f));
     rules_.setOrigin({ 0.f, 0.f });
     rules_.setPosition({ std::round((width - rules_.getLocalBounds().size.x) / 2.f), 155.f });
 
@@ -165,9 +169,11 @@ void Menu::resize(sf::Vector2u size)
     }
     else if (screen_ == Screen::Victory)
     {
-        mainButtons_[1].setBounds({ center - buttonWidth / 2.f, std::floor(height / 2.f - 24.f) },
+        mainButtons_[2].setBounds({ center - buttonWidth / 2.f, std::floor(height / 2.f - 44.f) },
             { buttonWidth, 48.f });
-        backButton_.setBounds({ center - buttonWidth / 2.f, std::floor(height / 2.f + 36.f) },
+        mainButtons_[1].setBounds({ center - buttonWidth / 2.f, std::floor(height / 2.f + 16.f) },
+            { buttonWidth, 48.f });
+        backButton_.setBounds({ center - buttonWidth / 2.f, std::floor(height / 2.f + 76.f) },
             { buttonWidth, 48.f });
     }
     else backButton_.setBounds({ center - 100.f, height - 108.f }, { 200.f, 48.f });
@@ -179,13 +185,22 @@ void Menu::setHasActiveGame(bool active)
     mainButtons_[0].enabled = active;
 }
 
+void Menu::setCanRestart(bool available)
+{
+    canRestart_ = available;
+    mainButtons_[2].enabled = available;
+}
+
 void Menu::showMain()
 {
     screen_ = Screen::Main;
     title_.setString("NXRP MAZE");
     subtitle_.setString("Find your way out.");
     mainButtons_[0].enabled = hasActiveGame_;
-    notice_ = hasActiveGame_ ? "An active game is available." : "No active game to continue.";
+    mainButtons_[2].enabled = canRestart_;
+    if (hasActiveGame_) notice_ = "An active game is available.";
+    else if (canRestart_) notice_ = "Maze complete. Restart it or choose New Game.";
+    else notice_ = "No active game to continue.";
     resize(viewport_);
 }
 
@@ -223,7 +238,7 @@ void Menu::showVictory(const MazeSize& completedSize)
     subtitle_.setString("The maze is complete.");
     victorySummary_.setString("Maze completed: " + std::to_string(completedSize.rows)
         + " x " + std::to_string(completedSize.cols));
-    notice_ = "Esc returns to the main menu.";
+    notice_ = "R restarts this maze. Esc returns to the main menu.";
     resize(viewport_);
 }
 
@@ -252,6 +267,9 @@ MenuAction Menu::handleEvent(const sf::Event& event, const sf::RenderWindow& win
 {
     if (const auto* key = event.getIf<sf::Event::KeyPressed>())
     {
+        if (key->code == sf::Keyboard::Key::R && canRestart_
+            && (screen_ == Screen::Main || screen_ == Screen::Victory))
+            return MenuAction::RestartMaze;
         if (key->code == sf::Keyboard::Key::Escape && screen_ != Screen::Main)
             return MenuAction::Back;
     }
@@ -268,6 +286,7 @@ MenuAction Menu::handleEvent(const sf::Event& event, const sf::RenderWindow& win
     {
         if (backButton_.hit(point)) return MenuAction::Back;
         if (screen_ == Screen::Victory && mainButtons_[1].hit(point)) return MenuAction::NewGame;
+        if (screen_ == Screen::Victory && mainButtons_[2].hit(point)) return MenuAction::RestartMaze;
         if (screen_ == Screen::Settings)
         {
             if (applyButton_.hit(point)) return MenuAction::ApplySettings;
@@ -290,7 +309,11 @@ void Menu::update(sf::Vector2f mousePosition)
     else
     {
         backButton_.update(mousePosition);
-        if (screen_ == Screen::Victory) mainButtons_[1].update(mousePosition);
+        if (screen_ == Screen::Victory)
+        {
+            mainButtons_[1].update(mousePosition);
+            mainButtons_[2].update(mousePosition);
+        }
         if (screen_ == Screen::Settings)
         {
             applyButton_.update(mousePosition);
@@ -316,6 +339,7 @@ void Menu::draw(sf::RenderTarget& target) const
         {
             target.draw(victorySummary_);
             mainButtons_[1].draw(target);
+            mainButtons_[2].draw(target);
             target.draw(message_);
         }
         else

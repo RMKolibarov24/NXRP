@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CppUnitTest.h"
 #include "Maze.Game.h"
+#include "Maze.Generation.h"
 
 #include <stdexcept>
 #include <utility>
@@ -159,6 +160,115 @@ namespace MazeUnitTest
             Assert::AreEqual(50, game.maze.size().cols);
             Assert::AreEqual(0, game.player.row);
             Assert::AreEqual(0, game.player.col);
+        }
+
+        TEST_METHOD(RestartPlayingGameKeepsLayoutAndAllocation)
+        {
+            for (const auto size : { MazeSize(10, 10), MazeSize(50, 50), MazeSize(10, 50) })
+            {
+                GameState game;
+                startGame(game, generateMaze(size, 42));
+                auto moved = tryMove(game, MoveDirection::Right);
+                if (moved == MoveResult::Blocked) moved = tryMove(game, MoveDirection::Down);
+                Assert::IsTrue(moved == MoveResult::Moved);
+                const auto* storage = &game.maze.at(0, 0);
+                const auto cells = ReadCells(game.maze);
+
+                Assert::IsTrue(restartGame(game));
+                Assert::IsTrue(storage == &game.maze.at(0, 0));
+                Assert::IsTrue(cells == ReadCells(game.maze));
+                Assert::AreEqual(size.rows, game.maze.size().rows);
+                Assert::AreEqual(size.cols, game.maze.size().cols);
+                Assert::AreEqual(0, game.player.row);
+                Assert::AreEqual(0, game.player.col);
+                Assert::IsTrue(game.phase == GamePhase::Playing);
+            }
+        }
+
+        TEST_METHOD(RestartPausedGameResetsPositionAndEntersPlaying)
+        {
+            GameState game;
+            startGame(game, PreparedMaze({ 12, 37 }));
+            Assert::IsTrue(tryMove(game, MoveDirection::Right) == MoveResult::Moved);
+            Assert::IsTrue(tryMove(game, MoveDirection::Down) == MoveResult::Moved);
+            game.phase = GamePhase::Paused;
+
+            Assert::IsTrue(restartGame(game));
+            Assert::AreEqual(0, game.player.row);
+            Assert::AreEqual(0, game.player.col);
+            Assert::IsTrue(game.phase == GamePhase::Playing);
+            Assert::IsTrue(tryMove(game, MoveDirection::Right) == MoveResult::Moved);
+        }
+
+        TEST_METHOD(RestartWonGameCanBePlayedAgain)
+        {
+            GameState game;
+            startGame(game, PreparedMaze({ 10, 10 }));
+            for (int round = 0; round < 2; ++round)
+            {
+                for (int i = 0; i < 9; ++i) tryMove(game, MoveDirection::Right);
+                for (int i = 0; i < 9; ++i) tryMove(game, MoveDirection::Down);
+                Assert::IsTrue(hasWon(game));
+                Assert::IsTrue(game.phase == GamePhase::Won);
+                Assert::IsTrue(restartGame(game));
+                Assert::IsFalse(hasWon(game));
+                Assert::AreEqual(0, game.player.row);
+                Assert::AreEqual(0, game.player.col);
+                Assert::IsTrue(game.phase == GamePhase::Playing);
+            }
+        }
+
+        TEST_METHOD(RestartPreservesNextGameSize)
+        {
+            GameState game;
+            startGame(game, PreparedMaze({ 10, 10 }));
+            game.selectedSize = MazeSize(50, 37);
+            game.phase = GamePhase::Paused;
+            Assert::IsTrue(restartGame(game));
+            Assert::AreEqual(50, game.selectedSize.rows);
+            Assert::AreEqual(37, game.selectedSize.cols);
+            Assert::AreEqual(10, game.maze.size().rows);
+            Assert::AreEqual(10, game.maze.size().cols);
+        }
+
+        TEST_METHOD(RestartWithoutSessionChangesNothing)
+        {
+            for (const auto phase : { GamePhase::Menu, GamePhase::Playing, GamePhase::Paused, GamePhase::Won })
+            {
+                GameState game;
+                game.phase = phase;
+                game.player = { 7, 9 };
+                game.selectedSize = MazeSize(50, 10);
+                Assert::IsFalse(restartGame(game));
+                Assert::IsTrue(game.maze.empty());
+                Assert::AreEqual(7, game.player.row);
+                Assert::AreEqual(9, game.player.col);
+                Assert::AreEqual(50, game.selectedSize.rows);
+                Assert::AreEqual(10, game.selectedSize.cols);
+                Assert::IsTrue(game.phase == phase);
+            }
+        }
+
+        TEST_METHOD(RestartRejectsUnstartedOrUnknownPhase)
+        {
+            for (const auto phase : { GamePhase::Menu, static_cast<GamePhase>(99) })
+            {
+                GameState game;
+                game.maze = PreparedMaze({ 10, 10 });
+                game.phase = phase;
+                game.player = { 1, 1 };
+                game.selectedSize = MazeSize(20, 30);
+                const auto* storage = &game.maze.at(0, 0);
+                const auto cells = ReadCells(game.maze);
+                Assert::IsFalse(restartGame(game));
+                Assert::IsTrue(game.phase == phase);
+                Assert::AreEqual(1, game.player.row);
+                Assert::AreEqual(1, game.player.col);
+                Assert::AreEqual(20, game.selectedSize.rows);
+                Assert::AreEqual(30, game.selectedSize.cols);
+                Assert::IsTrue(storage == &game.maze.at(0, 0));
+                Assert::IsTrue(cells == ReadCells(game.maze));
+            }
         }
     };
 }

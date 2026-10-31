@@ -70,6 +70,17 @@ void startGame(GameState& game, MazeGrid&& preparedMaze)
     game.phase = GamePhase::Playing;
 }
 
+bool restartGame(GameState& game) noexcept
+{
+    if (game.maze.empty() || (game.phase != GamePhase::Playing
+        && game.phase != GamePhase::Paused && game.phase != GamePhase::Won))
+        return false;
+
+    game.player = { 0, 0 };
+    game.phase = GamePhase::Playing;
+    return true;
+}
+
 void endGame(GameState& game) noexcept
 {
     game.maze = MazeGrid();

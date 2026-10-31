@@ -25,7 +25,7 @@ no circular project references.
 | `MazeApplication` | Own GameState and route events between gameplay and menu pages. |
 | `Menu` | Display Main, How to Play, Settings and Victory pages, and return MenuAction values. |
 | `GameView` | Translate arrow events into logic calls, draw cells/player and show movement feedback. |
-| `Maze.Game` | Start/end sessions, validate prepared layouts, apply movement and detect victory. |
+| `Maze.Game` | Start/restart/end sessions, validate prepared layouts, apply movement and detect victory. |
 | `Maze.Generation` | Create a connected random grid with an optional test seed. |
 | `Maze.Settings` | Load/save validated next-game dimensions through a supplied filesystem path. |
 | `SettingsPath` | Resolve the current Windows user's local app-data settings path. |
@@ -135,6 +135,7 @@ or validation errors therefore preserve the old session and show an error messag
 | Action | State and ownership behavior |
 | --- | --- |
 | New Game | Prepare/validate a replacement, release the previous owned grid on successful assignment, reset player to `(0, 0)` and enter Playing. |
+| Restart maze / R | Reset the existing session's player to `(0, 0)` and enter Playing. Keep every cell, the grid allocation and the selected next-game size. |
 | Escape during play | Set Paused and show the main menu. Keep the grid and player. |
 | Continue | Enter Playing with the same grid/player. Available only for an unfinished Playing/Paused session. |
 | Help or Settings | Display a menu page while preserving the paused session. |
@@ -148,6 +149,20 @@ or validation errors therefore preserve the old session and show an error messag
 controller's `canContinue()` additionally checks the phase, so a completed maze
 does not enable Continue. Menu page selection and GamePhase serve different
 purposes and should not be treated as interchangeable state machines.
+
+`restartGame(game)` accepts an existing Playing, Paused or Won session and
+returns true after resetting its player and phase. It performs no allocation,
+regeneration or settings-file I/O. It assumes the started session's prepared
+layout remains valid, as established by startGame. Empty games and unstarted
+or unknown phases return false without changing state. Restart takes O(1) time.
+
+The controller exposes restart through R during play and through the Restart
+maze buttons on the main menu and Victory page. R also works on those two menu
+pages. It resets GameView's movement feedback after success. R on Help or
+Settings has no effect, preserving a Settings draft until Save or Cancel.
+The restart button remains disabled until a session exists. A completed maze
+can restart even though Continue is disabled. New Game still uses the selected
+dimensions and calls the random generator.
 
 ## Persistent dimension preferences
 
@@ -203,7 +218,7 @@ Visual Studio template's PCH and warning level 3. All configurations target x64.
 SFML builds statically through `Prepare-Dependencies.ps1`; generated property
 sheets provide its headers, libraries and `SFML_STATIC` definition to Graphics.
 
-The native DLL contains 75 tests in seven classes:
+The native DLL contains 81 tests in seven classes:
 
 | Class | Tests | Coverage |
 | --- | ---: | --- |
@@ -212,7 +227,7 @@ The native DLL contains 75 tests in seven classes:
 | GameStateTests | 3 | Initial state and active-grid detection. |
 | MazeMovementTests | 20 | Directions, walls/bounds, invalid state, prepared layout validation and victory. |
 | MazeGenerationTests | 11 | Connectivity, seeds, even/odd sizes, invalid input and playable routes. |
-| MazeSessionTests | 6 | Repeated sessions, endGame, replacement failure and preference preservation. |
+| MazeSessionTests | 12 | Repeated sessions, endGame, replacement failure, same-maze restart and preference preservation. |
 | MazeSettingsTests | 12 | Valid/invalid files, whitespace, Unicode paths, replacement, missing directories and write failures. |
 
 Generation tests use an independent one-cell BFS rather than the generator's
@@ -230,11 +245,11 @@ See [validation](VALIDATION.md) for the final local checks and limitations.
 
 ## Implemented scope and remaining limits
 
-The current application includes the five-option graphical menu, random connected
+The current application includes the six-option graphical menu, random connected
 mazes, dimension controls, arrow movement, blocked feedback, pause/Continue,
-victory, safe session replacement and persistent dimension preferences. Gameplay
-state lasts only for the process lifetime. Seed input/replay, elapsed time, move counters,
-restart of the same layout and zoom are not exposed in this version.
+victory, same-maze restart, safe session replacement and persistent dimension
+preferences. Gameplay state lasts only for the process lifetime. Seed input/replay,
+elapsed time, move counters and zoom are not exposed in this version.
 
 The remaining QA cases are a complete manual hover/click sweep, a clean
 second-machine setup, and execution inside Visual Studio Test Explorer. The
