@@ -1,0 +1,2 @@
+PASS 10x10 at 900x600: exact subsecond/paused/resumed/regressed time; legal/winning moves; frozen victory; New Game/Restart/Exit resets and unchanged preferences.
+PASS 50x50 at 640x560: exact subsecond/paused/resumed/regressed time; legal/winning moves; frozen victory; New Game/Restart/Exit resets and unchanged preferences.

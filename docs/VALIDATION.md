@@ -32,11 +32,11 @@ source files.
 
 ## QA workbook
 
-The archived [QA guide](../QA/README.md) describes the 29 October regression
-evidence at the same source baseline. It records **78 distinct cases: 75 Passed,
+The 29 October regression evidence at the same source baseline originally
+recorded **78 distinct cases: 75 Passed,
 0 Failed and 3 Not Run**. The documentation-stage native runs above provide a
-fresh check, while the archived workbook retains its original observations,
-dates and evidence files.
+fresh check. The [QA guide](../QA/README.md) now describes the expanded workbook;
+its archived GUI observations and the original evidence files remain intact.
 
 The workbook now follows the supplied reference layout, with feature tabs,
 separate case banners, side-by-side metadata and step rows. Engine validation
@@ -258,3 +258,48 @@ Fit, maximum zoom, tracked middle/exit positions, continued play at minimum
 size, enlarged-window play, Help and Victory renders were reviewed. Controls
 and Help fit the minimum window. These synthetic-event/render checks do not
 replace the outstanding manual QA sweep or actual Test Explorer UI execution.
+
+## Current feature regression and QA update
+
+Executed **1 November 2026 UTC**, with the workbook review completed on
+**2 November 2026, Europe/Sofia**. Tested clean source:
+`9fd92aa1a9cb2f664ef20868901deb7806aaa762` on `dev`.
+This QA update changes no production source or Native Unit Test implementation.
+
+| Configuration | Solution build | Native tests | Feature probes |
+| --- | --- | --- | --- |
+| Debug / x64 | Passed | 109 passed, 0 failed | All five feature groups passed |
+| Release / x64 | Passed | 109 passed, 0 failed | All five feature groups passed |
+
+Fresh runs cover the complete current Native suite, including preferences,
+restart, game statistics, seed replay and viewport geometry. The private
+controller probes were compiled against the current production sources.
+Older probe click coordinates were adjusted for the six-item menu and seed
+field. No production behavior was changed to accommodate the probes.
+
+Both configurations exercised preference save/reload in separate processes,
+fallback/save failure paths, same-maze restart, pause/resume timing, successful
+move counts, seed entry/replay and bounded zoom. The route checks use an
+independent BFS. Graphics checks cover 10 by 10 at 900 by 600 and 50 by 50 at
+640 by 560, resize, Victory actions, player tracking and view/scissor restoration.
+All solution/probe build logs contain no compiler warning or error entries.
+
+The workbook retains its eight tabs and reference-style case panels. It now
+records **139 cases: 136 Passed, 0 Failed, 3 Not Run**. These comprise 109 current
+Native cases, 15 current Controller cases and 15 archived GUI/manual cases.
+The archived GUI cases preserve their original `44d251e` source, dates, full
+observations, outcomes and cell positions. Existing Native cases retain their
+IDs, creation metadata, test data and expectations with refreshed results.
+
+Workbook checks verified all 109 exact Native adapter names and recorded
+durations, 139 native internal links, dropdowns, formulas, failed/blank/partial
+status propagation and XLSX re-import. Temporary edits were restored. Views
+across all eight tabs and nine current minimum-window game renders were reviewed.
+The workbook has no formula errors in the checked engine.
+
+Fresh reports, feature logs, renders, source/evidence hashes and execution
+windows are under [FeatureRegression-20261101](../QA/Evidence/FeatureRegression-20261101/Regression.json).
+Earlier evidence remains unchanged. QA-013, QA-014 and QA-015 remain Not Run;
+native Excel UI opening and system-clipboard paste remain unverified. These
+console/synthetic-event checks do not replace actual manual or Test Explorer
+UI execution. QA preparation is assigned to NKPeshev24's manual commit.

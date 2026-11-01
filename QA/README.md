@@ -1,40 +1,94 @@
 # QA results
 
-Open `QA_Test_Cases.xlsx`. It starts on `Main Menu` and groups the 78 cases by
-feature: `Main Menu`, `Settings`, `Gameplay`, `Victory`, `Generation`,
-`Data and Sessions`, and `Setup`. The final `Summary` tab contains totals
-and links to each case. UI scenarios appear before supporting native cases.
+Open `QA_Test_Cases.xlsx`. The eight existing tabs and reference-style case
+panels are retained: `Main Menu`, `Settings`, `Gameplay`, `Victory`,
+`Generation`, `Data and Sessions`, `Setup`, and `Summary`.
 
-Each case uses a blue TEST CASE banner, side-by-side metadata and six step
-columns. Edit Actual Result and select PASSED, FAILED or NOT RUN from the
-Status dropdown. The whole step row turns green, red or amber. Case status
-and Summary totals recalculate; a blank or incomplete case stays NOT RUN.
+The workbook records **139 distinct cases: 136 Passed, 0 Failed, 3 Not Run**.
+The Summary separates the execution sources:
 
-All 63 Native Unit Tests retain their exact adapter names and both Debug/Release
-results. Full UI observations remain below each case details panel; the Actual
-Result column shows a short result for readability. The introductory menu
-display check is split into four observed steps without adding a new case.
+| Group | Cases | Passed | Failed | Not Run | Tested source |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Native | 109 | 109 | 0 | 0 | `9fd92aa`, Debug and Release / x64 |
+| Controller | 15 | 15 | 0 | 0 | `9fd92aa`, synthetic events and render checks in both configurations |
+| GUI | 15 | 12 | 0 | 3 | Archived `44d251e` observations and pending manual checks |
 
-Tested source: `44d251e215951517147ecfbb09f292fb42eefa29`, clean at execution.
-This QA change adds records only. Run times in the workbook and TRX reports use UTC.
-QA review owner: **NKPeshev24**. Commit owner: **RMKolibarov24**.
-The workbook was prepared with Codex;
-execution methods distinguish native tests, Sky UI observations and controller probes.
+Current tested commit: `9fd92aa1a9cb2f664ef20868901deb7806aaa762`.
+The working tree was clean when execution started. Runs took place on
+**1 November 2026 UTC**; the workbook review completed on **2 November,
+Europe/Sofia**. Run timestamps in the workbook and reports use UTC.
+QA and manual commit owner: **NKPeshev24**. Preparation and checks used Codex.
+This change updates QA records and validation notes without changing production
+code or the Native Unit Test project.
 
-The recorded result is **78 distinct cases: 75 Passed, 0 Failed, 3 Not Run**.
-The pending cases are the complete manual button sweep, setup on a second clean
-machine, and execution in the actual Visual Studio Test Explorer UI.
-Native VSTest console execution passed **63/63 in each configuration**.
+## Using the workbook
 
-`Evidence/` contains the two original TRX reports, controller-probe output and
-three inspected renders. Controller probes exercised the real application through
-synthetic SFML events and offscreen rendering. They are separate exploratory checks,
-not additional Native Unit Tests; their temporary harnesses are outside the repository.
-The 10x10/50x50 minimum-window board renders were checked in Debug. Screen navigation
-and victory probes were run in both configurations.
+Each case has a blue banner, side-by-side metadata and six step columns.
+Edit Actual Result and choose PASSED, FAILED or NOT RUN in the Status dropdown.
+Whole-row colors, case status and Summary totals recalculate. A blank or
+partially completed case stays NOT RUN; a failed step makes its case FAILED.
+Summary case IDs link to their existing or newly appended case panels.
 
-To repeat the native checks, use **Developer Command Prompt for VS 2026** from the
-repository root after preparing dependencies:
+All 109 Native cases use exact adapter names and separate Debug/Release steps,
+including actual runner durations. The existing 63 Native case IDs, creation
+metadata, test data and expectations remain in place; their execution results
+now reference the fresh runs. Another 46 Native cases and 15 Controller cases
+cover preferences, restart, statistics, seed replay and zoom.
+
+The original 15 GUI cases retain their complete observations, dates, source
+version, outcomes and positions. They describe the earlier interface, including
+its five-item menu. Current six-item menu, Help, Settings and Victory behavior
+is recorded in the Controller cases. Archived GUI results are not claimed as
+new observations of the current version.
+
+## Current evidence
+
+[Regression provenance](Evidence/FeatureRegression-20261101/Regression.json)
+records the source revision, execution windows, methods, class counts and
+SHA-256 hashes of evidence, tested sources and private probe sources.
+
+- [Native Debug report](Evidence/FeatureRegression-20261101/Native-Debug.trx)
+  and [Native Release report](Evidence/FeatureRegression-20261101/Native-Release.trx):
+  **109/109 passed in each configuration**.
+- [Debug build](Evidence/FeatureRegression-20261101/Build-Debug.txt) and
+  [Release build](Evidence/FeatureRegression-20261101/Build-Release.txt).
+- Preferences, Restart, Statistics, Seed and Zoom text logs in the same folder,
+  with one result file per feature and configuration.
+- Nine reviewed Debug renders at the 640 by 560 minimum, including the menu,
+  Help, valid/invalid seed settings, fitted/zoomed/tracked boards, statistics
+  and Victory.
+
+The private probes compile the actual Graphics sources and link Data/Logic.
+They use synthetic SFML events, hidden windows, isolated preference files,
+independent BFS routes and offscreen rendering. Statistics checks inject exact
+monotonic timestamps. They cover 10 by 10 at 900 by 600 and 50 by 50 at
+640 by 560, including resize and session transitions. Preference checks also
+use separate processes to verify loading saved dimensions and failure paths.
+These probes are separate from Native Unit Tests and manual UI execution.
+Temporary harnesses and workbook builders stay outside the repository.
+
+## Archived evidence and pending checks
+
+The original files directly under `Evidence/` are unchanged. They retain the
+29 October results at `44d251e`: 63/63 Native tests per configuration,
+controller logs and three inspected renders. The original workbook recorded
+78 cases: 75 Passed, 0 Failed and 3 Not Run.
+
+The following remain **Not Run**:
+
+- **QA-013:** complete manual hover/click sweep across all pages and controls.
+- **QA-014:** setup and build on a second clean Windows computer.
+- **QA-015:** execution in the actual Visual Studio Test Explorer UI.
+
+Opening the file in the native Excel UI and a system-clipboard paste check
+remain unverified. Workbook checks used the spreadsheet engine: recalculation,
+failed/blank/partial status propagation, restored temporary edits, reviewed
+renders across all eight sheets, native internal links and XLSX re-import.
+
+## Repeat native regression
+
+Use **Developer Command Prompt for VS 2026** from the repository root after
+preparing dependencies:
 
 ```bat
 MSBuild NXRP.slnx /p:Configuration=Debug /p:Platform=x64
@@ -43,11 +97,6 @@ MSBuild NXRP.slnx /p:Configuration=Release /p:Platform=x64
 "%VSINSTALLDIR%Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe" build\bin\Release\Maze.UnitTest.dll /Platform:x64 /Logger:trx /ResultsDirectory:build\TestResults\Release
 ```
 
-Keep archived evidence unchanged. After a new run, update each affected case's code
-version, Actual Result, Status, execution notes, Modified by and Last modified on. The Summary totals
-update from the case steps. A blank or incomplete step keeps its case Not Run.
-
-The workbook was checked with the spreadsheet engine: recalculation, failure/blank
-propagation, restored test edits, rendering of all eight sheets and XLSX re-import.
-The native Excel UI opening check was not completed because app-control approval
-timed out.
+Keep archived evidence unchanged. For a new run, update each affected case's
+code version, Actual Result, Status, execution notes, Modified by and Last
+modified on. Record the actual execution method and add fresh evidence.

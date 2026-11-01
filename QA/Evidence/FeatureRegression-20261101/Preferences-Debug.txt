@@ -1,0 +1,7 @@
+PASS: save, corrupt-file fallback, active-session preservation, Cancel/Escape and close.
+PASS: a separate process loaded 13x38 and New Game used it.
+PASS: out-of-range dimensions fell back without rewriting the file.
+Could not save maze size preferences to: "C:\\Users\\rafat\\Documents\\Codex\\nxrp-feature-qa-20261101\\results\\Debug\\Preferences\\isolated-user\\blocker.txt\\settings.txt"
+PASS: failed save retained the in-memory size, preserved existing data and allowed New Game.
+Could not save maze size preferences to: ""
+PASS: unavailable storage kept default startup and session-only preferences.
