@@ -22,6 +22,8 @@ namespace MazeUnitTest
             Assert::AreEqual(0, game.player.col);
             Assert::IsTrue(game.statistics.elapsed == std::chrono::steady_clock::duration::zero());
             Assert::IsTrue(game.statistics.successfulMoves == 0);
+            Assert::IsFalse(game.selectedSeed.has_value());
+            Assert::IsFalse(game.mazeSeed.has_value());
         }
 
         TEST_METHOD(ChangingSelectedSizeDoesNotAllocateAMaze)

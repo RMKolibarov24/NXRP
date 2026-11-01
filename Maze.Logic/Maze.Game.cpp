@@ -61,11 +61,12 @@ MazeGrid createDemoMaze()
     return maze;
 }
 
-void startGame(GameState& game, MazeGrid&& preparedMaze)
+void startGame(GameState& game, MazeGrid&& preparedMaze, std::optional<std::uint32_t> seed)
 {
     validatePreparedMaze(preparedMaze);
     const MazeSize size = preparedMaze.size();
     game.maze = std::move(preparedMaze);
+    game.mazeSeed = seed;
     game.selectedSize = size;
     game.player = { 0, 0 };
     game.phase = GamePhase::Playing;
@@ -87,6 +88,7 @@ bool restartGame(GameState& game) noexcept
 void endGame(GameState& game) noexcept
 {
     game.maze = MazeGrid();
+    game.mazeSeed.reset();
     game.player = { 0, 0 };
     game.phase = GamePhase::Menu;
     game.statistics = {};

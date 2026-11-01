@@ -51,6 +51,8 @@ Passage and Exit. `GameState` contains:
 - A GamePhase: Menu, Playing, Paused or Won.
 - GameStatistics containing an elapsed steady-clock duration and a 64-bit
   unsigned successful-move count, both initially zero.
+- Optional selectedSeed for the next game and mazeSeed for the current generated
+  grid. An empty selectedSeed means random generation; zero is a valid seed.
 
 MazeGrid represents a two-dimensional grid with one **contiguous dynamic array**:
 
@@ -129,19 +131,20 @@ validation scans the grid in O(rows * cols) time. It checks structure; the
 generator and independent reachability tests establish a path to the exit.
 
 If validation fails, the old session and the supplied grid remain unchanged.
-After successful validation, startGame moves in the prepared array, updates the
+After successful validation, startGame moves in the prepared array, records the
+supplied seed (or clears stale metadata for an unseeded fixture), updates the
 selected size to its dimensions, resets the player and enters Playing.
 The GUI prepares the entire new random maze before calling startGame. Generation
 or validation errors therefore preserve the old session and show an error message.
 
 | Action | State and ownership behavior |
 | --- | --- |
-| New Game | Prepare/validate a replacement, release the previous owned grid on successful assignment, reset player to `(0, 0)` and enter Playing. |
+| New Game | Generate using the selected dimensions and seed/mode, validate the replacement, release the previous owned grid, reset player/statistics and enter Playing. |
 | Restart maze / R | Reset player and statistics, then enter Playing. Keep every cell, the grid allocation and the selected next-game size. |
 | Escape during play | Set Paused and show the main menu. Keep the grid and player. |
 | Continue | Enter Playing with the same grid/player. Available only for an unfinished Playing/Paused session. |
 | Help or Settings | Display a menu page while preserving the paused session. |
-| Save size | Validate and store the next-game dimensions in memory and the user's settings file. Keep the current grid. On a write failure, keep the size for this launch and show a message. |
+| Apply Settings | Validate dimensions/seed, store both choices in memory, and save dimensions to the settings file. Keep the current grid/seed. On a write failure, keep the choices for this launch and show a message. |
 | Back/Escape from Settings | Discard the draft by returning without applying it. |
 | Reach the exit | Set Won and display the Victory page. Continue becomes unavailable. |
 | Main menu after victory | Show the menu while retaining Won and its completed grid until replacement or exit. |
@@ -160,11 +163,35 @@ or unknown phases return false without changing state. Restart takes O(1) time.
 
 The controller exposes restart through R during play and through the Restart
 maze buttons on the main menu and Victory page. R also works on those two menu
-pages. It resets GameView's movement feedback after success. R on Help or
-Settings has no effect, preserving a Settings draft until Save or Cancel.
+pages. It resets GameView's movement feedback after success. The restart shortcut
+is inactive on Help and Settings; text input edits the focused Seed field.
 The restart button remains disabled until a session exists. A completed maze
 can restart even though Continue is disabled. New Game still uses the selected
 dimensions and calls the random generator.
+
+## Seed selection and replay
+
+`generateMazeSeed()` obtains entropy once. New Game uses selectedSeed when it has
+a value, otherwise obtains a random seed. It passes that same value to generation
+and startGame, so the displayed mazeSeed describes the actual generated map.
+The conditional does not request entropy when a fixed seed was selected.
+
+`parseMazeSeed` accepts an empty string for random mode or 1–10 decimal digits
+within the uint32 range. It rejects signs, whitespace, non-digits and overflow.
+Failure preserves the output argument. The UI accepts bounded text input,
+Backspace, Delete and Ctrl+V replacement, validates as it edits, and disables
+Apply for invalid input. Cancel/Escape discards both dimension and seed drafts.
+Invalid text never overwrites the paused session or its saved dimensions.
+
+The current generated seed appears on the game display and Victory page.
+Replay requires matching dimensions and seed on the same generator/toolchain.
+Settings changes affect only the next New Game. Restart preserves current seed,
+every cell and allocation while resetting position/statistics. endGame clears
+the current seed while preserving the selected next-game choice. Plain prepared
+fixtures can omit a seed. The API trusts callers to supply the seed actually used.
+
+Selected seeds are kept in memory for the current launch. The preferences file
+retains its existing two-dimension format, so older saved sizes stay compatible.
 
 ## Game time and successful moves
 
@@ -207,7 +234,7 @@ integers, rows and columns. The loader rejects missing/overflowed numbers,
 dimensions outside 10–50 and trailing non-whitespace data. Missing or unreadable
 files also return the 10 by 10 default. Loading does not create or rewrite files.
 
-Save size updates the next-game preference and writes a temporary sibling file.
+Apply updates the next-game preferences and writes a temporary sibling size file.
 Only after closing a complete file does it rename the replacement over the old
 preferences. Invalid dimensions are rejected before any filesystem mutation.
 Directory, write and rename failures return false. MazeApplication keeps the
@@ -246,7 +273,7 @@ Visual Studio template's PCH and warning level 3. All configurations target x64.
 SFML builds statically through `Prepare-Dependencies.ps1`; generated property
 sheets provide its headers, libraries and `SFML_STATIC` definition to Graphics.
 
-The native DLL contains 91 tests in eight classes:
+The native DLL contains 101 tests in nine classes:
 
 | Class | Tests | Coverage |
 | --- | ---: | --- |
@@ -258,6 +285,7 @@ The native DLL contains 91 tests in eight classes:
 | MazeSessionTests | 12 | Repeated sessions, endGame, replacement failure, same-maze restart and preference preservation. |
 | MazeSettingsTests | 12 | Valid/invalid files, whitespace, Unicode paths, replacement, missing directories and write failures. |
 | GameStatisticsTests | 10 | Active/paused/victory time, accepted moves, reset/failure semantics, fractional time and saturation. |
+| MazeSeedTests | 10 | Seed parsing/range, optional zero, replay metadata, restart/end/replacement lifecycle and recorded random seeds. |
 
 Generation tests use an independent one-cell BFS rather than the generator's
 two-cell DFS. They check that every walkable cell is reachable and follow found
@@ -277,8 +305,8 @@ See [validation](VALIDATION.md) for the final local checks and limitations.
 The current application includes the six-option graphical menu, random connected
 mazes, dimension controls, arrow movement, blocked feedback, pause/Continue,
 victory, same-maze restart, safe session replacement and persistent dimension
-preferences, elapsed time and successful-move counts. Gameplay state lasts only
-for the process lifetime. Seed input/replay and zoom are not exposed in this version.
+preferences, elapsed time, successful-move counts and seed replay. Gameplay state
+and the seed choice last only for the process lifetime. Zoom is not exposed in this version.
 
 The remaining QA cases are a complete manual hover/click sweep, a clean
 second-machine setup, and execution inside Visual Studio Test Explorer. The

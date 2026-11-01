@@ -56,7 +56,8 @@ void MazeApplication::beginNewGame()
 {
     try
     {
-        startGame(game_, generateMaze(game_.selectedSize));
+        const auto seed = game_.selectedSeed ? *game_.selectedSeed : generateMazeSeed();
+        startGame(game_, generateMaze(game_.selectedSize, seed), seed);
         gameView_.reset();
     }
     catch (const std::exception& error)
@@ -113,7 +114,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
             {
                 menu_.setHasActiveGame(false);
                 menu_.setCanRestart(canRestart());
-                menu_.showVictory(game_.maze.size(), game_.statistics);
+                menu_.showVictory(game_.maze.size(), game_.statistics, game_.mazeSeed);
             }
         }
         return;
@@ -125,21 +126,25 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         menu_.showHowToPlay();
         break;
     case MenuAction::Settings:
-        menu_.showSettings(game_.selectedSize);
+        menu_.showSettings(game_.selectedSize, game_.selectedSeed);
         break;
     case MenuAction::Back:
         showMainMenu();
         break;
     case MenuAction::ApplySettings:
-        if (isValidMazeSize(menu_.draftSize()))
+    {
+        std::optional<std::uint32_t> seed;
+        if (isValidMazeSize(menu_.draftSize()) && menu_.draftSeed(seed))
         {
             game_.selectedSize = menu_.draftSize();
+            game_.selectedSeed = seed;
             const bool saved = saveMazeSizePreferences(settingsPath_, game_.selectedSize);
             showMainMenu();
             if (saved)
             {
                 menu_.showMessage("Saved size: " + std::to_string(game_.selectedSize.rows)
-                    + " x " + std::to_string(game_.selectedSize.cols) + ". Applies to New Game.");
+                    + " x " + std::to_string(game_.selectedSize.cols) + ". Next seed: "
+                    + (seed ? std::to_string(*seed) : "random") + ".");
             }
             else
             {
@@ -148,6 +153,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
             }
         }
         break;
+    }
     case MenuAction::NewGame:
         beginNewGame();
         break;

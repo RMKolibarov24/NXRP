@@ -57,10 +57,10 @@ build\bin\Debug\Maze.Graphics.exe
 | Arrow keys | Move one cell per press. Walls and outer boundaries block movement. |
 | Escape during play | Pause and open the main menu. |
 | Continue | Resume the same maze and position. Available only for an unfinished session. |
-| New Game | Generate a maze using the selected dimensions and start at `(0, 0)`. Replaces any previous session. |
-| Restart maze / R | Start the same maze again at `(0, 0)`. Available during play, from the main menu and after victory. Keeps its layout and the next-game size. R is ignored on Help and Settings pages. |
+| New Game | Generate a maze using the selected dimensions and seed/mode, then start at `(0, 0)`. Replaces any previous session. |
+| Restart maze / R | Start the same maze again at `(0, 0)`. Available during play, from the main menu and after victory. Keeps its layout/seed and the next-game preferences. The shortcut is inactive on Help and Settings. |
 | How to Play | Show the rules. Back or Escape returns to the main menu. |
-| Settings | Use the separate row/column minus/plus controls, then **Save size**. Back or Escape discards the draft. |
+| Settings | Choose rows/columns and an optional seed, then **Apply**. Cancel or Escape discards the draft. |
 | Exit or window close | Release the current maze and close the application. |
 
 The yellow player starts at the top-left passage. The green exit is at
@@ -71,13 +71,26 @@ until a session exists, and it becomes available again for a completed maze.
 
 Settings apply to the **next New Game**. Continue keeps the existing grid.
 Settings persist between launches in `%LOCALAPPDATA%\NXRP\settings.txt` for the
-current Windows user. **Save size** writes both dimensions. Missing, unreadable
+current Windows user. **Apply** writes both dimensions. Missing, unreadable
 or malformed preferences use 10 by 10. If saving fails, the size still applies
 to New Game for this launch, and the menu explains that it could not save it.
 The file contains two integers: rows followed by columns. Both must be 10–50,
 with no extra data other than whitespace. Closing the game and deleting this
 specific file restores the defaults on the next launch. The maze and player
 position remain in memory only.
+
+The current seed is shown beside MAZE and on the victory page. To replay a
+layout, choose the same rows/columns in Settings, click the Seed field, enter
+its decimal seed, press Apply, then New Game. Valid seeds are 0 through
+4294967295, including zero. Leave the field empty for random generation.
+Backspace edits, Delete clears and Ctrl+V replaces the field with clipboard text.
+Enter applies valid settings. Invalid input disables Apply and shows the range.
+
+The seed choice lasts for this launch. Only dimensions are saved to disk.
+New Game uses the selected seed/mode; Restart keeps the current grid and seed.
+Changing Settings while paused affects the next New Game and preserves the
+current maze. Replay requires the same generator/toolchain as well as the same
+seed and dimensions.
 
 The game display shows elapsed time and successful moves. Time runs only while
 Playing, pauses across the main menu/Help/Settings, and freezes when the exit is
@@ -108,10 +121,10 @@ Build products, dependency downloads and `.vs/` caches stay ignored.
 
 ## Native unit tests
 
-Build the solution, then open **Test > Test Explorer > Run All**. The 91 tests
+Build the solution, then open **Test > Test Explorer > Run All**. The 101 tests
 belong to `MazeSizeTests`, `MazeGridTests`, `GameStateTests`,
-`MazeMovementTests`, `MazeGenerationTests`, `MazeSessionTests`, `MazeSettingsTests`
-and `GameStatisticsTests`.
+`MazeMovementTests`, `MazeGenerationTests`, `MazeSessionTests`, `MazeSettingsTests`,
+`GameStatisticsTests` and `MazeSeedTests`.
 
 `Maze.UnitTest` is a **Native Unit Test Project** created in Visual Studio. It
 uses `CppUnitTest.h`, `TEST_CLASS`, `TEST_METHOD` and `Assert`. Its output is a

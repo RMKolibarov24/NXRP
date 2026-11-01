@@ -24,11 +24,12 @@ namespace
 }
 
 GameView::GameView(const sf::Font& font)
-    : title_(font, "MAZE", 30), controls_(font, "", 18),
+    : title_(font, "MAZE", 30), seed_(font, "", 20), controls_(font, "", 18),
       legend_(font, "", 17), position_(font, "", 22), statistics_(font, "", 22), message_(font, "", 20),
       cellLabel_(font, "", 16)
 {
     title_.setFillColor(textColor);
+    seed_.setFillColor(mutedColor);
     controls_.setFillColor(mutedColor);
     legend_.setFillColor(textColor);
     position_.setFillColor(textColor);
@@ -79,6 +80,9 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         + std::to_string(game.maze.size().cols) + "  |  Arrow keys: move  |  R: restart  |  Esc: menu");
     controls_.setPosition({ 24.f, 56.f });
     target.draw(title_);
+    seed_.setString(game.mazeSeed ? "Seed " + std::to_string(*game.mazeSeed) : "Seed unavailable");
+    seed_.setPosition({ 140.f, 24.f });
+    target.draw(seed_);
     target.draw(controls_);
 
     const sf::Color legendColors[] = { wallColor, passageColor, exitColor, playerColor };

@@ -19,6 +19,7 @@ private:
     sf::Vector2u viewport_{ 900u, 600u };
     std::string notice_;
     sf::Text title_;
+    sf::Text seed_;
     sf::Text controls_;
     sf::Text legend_;
     sf::Text position_;

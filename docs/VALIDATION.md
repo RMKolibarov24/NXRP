@@ -179,3 +179,42 @@ The shared text formatter was checked at zero, fractional seconds, a minute
 boundary and one hour. The updated game display and Victory page were rendered
 and reviewed at both sizes. These engine/controller checks do not claim completion
 of the outstanding manual QA sweep or native Test Explorer UI check.
+
+## Seed replay validation
+
+Date: **1 November 2026**. Tested source: `df931d6` plus the seed-replay
+working-tree changes, before their manual commit.
+
+| Configuration | Solution build | Native tests | Added seed tests |
+| --- | --- | --- | --- |
+| Debug / x64 | Passed | 101 passed, 0 failed | 10 passed |
+| Release / x64 | Passed | 101 passed, 0 failed | 10 passed |
+
+MazeSeedTests covers empty/random input, zero, maximum uint32, leading zeros,
+signs, whitespace, non-digits, overflow and excessive length. It also covers
+recording the used seed, repeated layouts, clearing stale fixture metadata,
+restart/end/replacement behavior and replaying a recorded random seed. The
+generator/toolchain and dimensions remain part of the replay contract.
+
+Controller probes used real application code, synthetic input, exact timestamps,
+isolated dimension files and hidden windows in both configurations. They checked
+10 by 10 at 900 by 600 and 50 by 50 at the 640 by 560 minimum. Each probe verified:
+
+- Random New Game records a seed that reproduces the complete grid.
+- Overflow, negative, nonnumeric and long invalid input cannot apply or write
+  settings. Keyboard entry, Backspace, Delete, focus changes and Enter work.
+- Cancel and Escape discard seed drafts. Editing preserves the paused layout,
+  allocation, player, current seed and statistics. Continue retains the old maze.
+- Seed zero is a fixed seed. Repeated New Game actions reproduce every cell.
+- Maximum seed 4294967295 works with changed row/column selections, including
+  rectangular grids. New Game resets statistics and the resulting seed remains
+  visible on victory after following an independent BFS route.
+- Clearing the field restores random mode. Restart retains the current fixed
+  layout/seed even when the next-game choice changes. Close clears current seed
+  metadata. Fresh construction restores saved dimensions with a random seed choice.
+
+Settings in random, invalid and maximum-seed states, the zero-seed game display,
+and maximum-seed Victory renders were reviewed at both sizes. Long invalid text
+stays within the input box. Clipboard paste support was built, while system
+clipboard contents were not changed for these checks. These probes do not replace
+the outstanding manual QA sweep or actual Test Explorer UI execution.

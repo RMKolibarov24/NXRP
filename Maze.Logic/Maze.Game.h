@@ -25,7 +25,9 @@ MazeGrid createDemoMaze();
 // The start must be a passage; the only exit must be at the bottom-right.
 // Empty grids, unknown cell values and invalid layouts throw invalid_argument
 // before changing either the game or preparedMaze. Reachability is not checked.
-void startGame(GameState& game, MazeGrid&& preparedMaze);
+// Supply the seed actually used for a generated grid; fixtures may omit it.
+void startGame(GameState& game, MazeGrid&& preparedMaze,
+    std::optional<std::uint32_t> seed = std::nullopt);
 
 // Restarts a Playing, Paused or Won session at (0,0) without replacing its grid.
 // Uses the existing layout already validated by startGame.
