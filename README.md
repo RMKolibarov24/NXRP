@@ -55,6 +55,8 @@ build\bin\Debug\Maze.Graphics.exe
 | Control or menu item | Behavior |
 | --- | --- |
 | Arrow keys | Move one cell per press. Walls and outer boundaries block movement. |
+| Mouse wheel / + / - | Zoom between 100% and 400%. The wheel works over the board. The view follows the player. |
+| 0 / Home | Fit the entire maze into the board area. Numpad +, -, and 0 also work. |
 | Escape during play | Pause and open the main menu. |
 | Continue | Resume the same maze and position. Available only for an unfinished session. |
 | New Game | Generate a maze using the selected dimensions and seed/mode, then start at `(0, 0)`. Replaces any previous session. |
@@ -98,8 +100,11 @@ reached. The victory page shows the final results. Blocked requests do not add
 moves; the winning step counts once. New Game and Restart reset both statistics,
 while Continue preserves them. Time uses total minutes and two-digit seconds.
 
-The board fits the window, including a 50 by 50 maze at
-the minimum supported window size of 640 by 560.
+The board initially fits the window, including a 50 by 50 maze at the minimum
+supported size of 640 by 560. Zoom clips the board to its own area, keeping the
+controls, coordinates and statistics visible. Continue retains zoom. New Game
+and Restart return to the full-map view. Resizing retains the zoom level and
+keeps the player's cell visible. Zoom changes no maze cells or move counts.
 
 ## Projects and files
 
@@ -121,10 +126,10 @@ Build products, dependency downloads and `.vs/` caches stay ignored.
 
 ## Native unit tests
 
-Build the solution, then open **Test > Test Explorer > Run All**. The 101 tests
+Build the solution, then open **Test > Test Explorer > Run All**. The 109 tests
 belong to `MazeSizeTests`, `MazeGridTests`, `GameStateTests`,
 `MazeMovementTests`, `MazeGenerationTests`, `MazeSessionTests`, `MazeSettingsTests`,
-`GameStatisticsTests` and `MazeSeedTests`.
+`GameStatisticsTests`, `MazeSeedTests` and `MazeViewportTests`.
 
 `Maze.UnitTest` is a **Native Unit Test Project** created in Visual Studio. It
 uses `CppUnitTest.h`, `TEST_CLASS`, `TEST_METHOD` and `Assert`. Its output is a
@@ -142,7 +147,7 @@ MSBuild NXRP.slnx /p:Configuration=Release /p:Platform=x64
 
 The suite checks ownership and bounds, movement and victory, session replacement/restart,
 preference round-trips, malformed/unwritable files, game time and successful moves,
-fixed-seed repeatability and independently verified reachability for all 1,681
+fixed-seed repeatability, camera bounds/player tracking and independently verified reachability for all 1,681
 allowed size pairs. [QA results](QA/README.md) distinguish CLI runs, UI observations
 and checks that remain unrun. [Final validation](docs/VALIDATION.md) records the
 documentation-stage rebuild and subsequent feature checks.

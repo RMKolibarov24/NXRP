@@ -249,14 +249,28 @@ The file lives outside the checkout and does not belong in Git.
 API references: [Windows known-folder lookup](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath),
 [C++ filesystem operations](https://learn.microsoft.com/en-us/cpp/standard-library/filesystem-functions?view=msvc-170).
 
-## Rendering and resources
+## Rendering, zoom and resources
 
 The window starts at 900 by 600 and enforces a minimum of 640 by 560. GameView
 reserves space for the title, legend and status text, then computes an integer
-cell size that fits both dimensions. It centers the grid in the remaining area.
+cell size that fits both dimensions, with space for the border. It centers the grid in the remaining area.
 It draws all cells as one triangle vertex batch and overlays the player marker.
 Large grids use the same model and movement rules. Small cells omit S/E text
 labels while retaining distinct exit/player colors.
+
+MazeViewport is an SFML-free header in Graphics containing the actual camera
+calculations. Its bounded integer zoom level runs from 1 to 4. It multiplies the
+fitted cell size by that level, centers dimensions that still fit, and otherwise
+follows the player's cell with offsets clamped to the grid edges. Zero/tiny or
+non-finite areas and invalid dimensions produce no drawable layout.
+
+GameView uses a separate SFML view with a viewport and scissor confined to the
+board area. The board's world coordinates begin at zero. After drawing it,
+GameView restores the caller's view, so the HUD and menu retain pixel coordinates.
+Mouse-wheel input changes zoom only over the board. + and - also change zoom;
+0 or Home restores fit. All zoom input is routed only during play. Continue
+resets feedback while retaining zoom. New Game and Restart reset to fit.
+Resize recomputes geometry without changing the zoom level or game state.
 
 The graphical build copies `assets/` beside the executable. `executableDirectory()`
 uses the Windows module path instead of the process working directory. The
@@ -273,7 +287,7 @@ Visual Studio template's PCH and warning level 3. All configurations target x64.
 SFML builds statically through `Prepare-Dependencies.ps1`; generated property
 sheets provide its headers, libraries and `SFML_STATIC` definition to Graphics.
 
-The native DLL contains 101 tests in nine classes:
+The native DLL contains 109 tests in ten classes:
 
 | Class | Tests | Coverage |
 | --- | ---: | --- |
@@ -286,6 +300,11 @@ The native DLL contains 101 tests in nine classes:
 | MazeSettingsTests | 12 | Valid/invalid files, whitespace, Unicode paths, replacement, missing directories and write failures. |
 | GameStatisticsTests | 10 | Active/paused/victory time, accepted moves, reset/failure semantics, fractional time and saturation. |
 | MazeSeedTests | 10 | Seed parsing/range, optional zero, replay metadata, restart/end/replacement lifecycle and recorded random seeds. |
+| MazeViewportTests | 8 | Zoom bounds, fit/border, player visibility, corners, resize, invalid areas and following movement. |
+
+The native camera tests include the same SFML-free Graphics header used by
+GameView. They add no SFML dependency or Graphics executable reference to the
+native test DLL.
 
 Generation tests use an independent one-cell BFS rather than the generator's
 two-cell DFS. They check that every walkable cell is reachable and follow found
@@ -306,7 +325,8 @@ The current application includes the six-option graphical menu, random connected
 mazes, dimension controls, arrow movement, blocked feedback, pause/Continue,
 victory, same-maze restart, safe session replacement and persistent dimension
 preferences, elapsed time, successful-move counts and seed replay. Gameplay state
-and the seed choice last only for the process lifetime. Zoom is not exposed in this version.
+and the seed choice last only for the process lifetime. The board also supports
+bounded zoom with player tracking and a fit-to-window view.
 
 The remaining QA cases are a complete manual hover/click sweep, a clean
 second-machine setup, and execution inside Visual Studio Test Explorer. The

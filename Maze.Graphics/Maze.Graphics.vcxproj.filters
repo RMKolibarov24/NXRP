@@ -38,6 +38,9 @@
     <ClInclude Include="GameView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MazeViewport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="GameStatisticsText.h">
       <Filter>Header Files</Filter>
     </ClInclude>

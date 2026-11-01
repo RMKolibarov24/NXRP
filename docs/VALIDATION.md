@@ -218,3 +218,43 @@ and maximum-seed Victory renders were reviewed at both sizes. Long invalid text
 stays within the input box. Clipboard paste support was built, while system
 clipboard contents were not changed for these checks. These probes do not replace
 the outstanding manual QA sweep or actual Test Explorer UI execution.
+
+## Maze zoom validation
+
+Date: **1 November 2026**. Tested source: `83791e9` plus the maze-zoom
+working-tree changes, before their manual commit.
+
+| Configuration | Solution build | Native tests | Added viewport tests |
+| --- | --- | --- | --- |
+| Debug / x64 | Passed | 109 passed, 0 failed | 8 passed |
+| Release / x64 | Passed | 109 passed, 0 failed | 8 passed |
+
+MazeViewportTests exercises zoom limits, whole-grid fit including the border,
+player visibility at the center and all corners, rectangular grids, resizing,
+fit reset, invalid/tiny areas and following real movement through victory.
+The camera calculations use no SFML types; the Native Unit Test project keeps
+its existing Data/Logic references without linking the graphics executable.
+
+Separate rendering/controller probes used the actual GameView and
+MazeApplication in both configurations. Each checked 10 by 10 at 900 by 600
+and 50 by 50 at the 640 by 560 minimum, with exact timestamps, isolated
+preference files, hidden windows and independent BFS routes. They verified:
+
+- Wheel and keyboard zoom stay between 100% and 400%. Numpad keys work;
+  0, numpad 0 and Home restore fit. Horizontal, zero/nonfinite and off-board
+  wheel events leave the view unchanged.
+- The player stays visible while moving to the exit at maximum zoom. Resizing
+  preserves the zoom level. The complete grid and its border remain visible
+  at fit, including rectangular grids covered by the native tests.
+- Pixel comparisons show the zoomed board stays inside its own area without
+  overwriting the HUD. GameView restores the caller's view, viewport and
+  scissor; a reused render target clears and redraws correctly after zooming.
+- Continue retains zoom after a pause, Help, Settings and resize. Those menu
+  pages ignore zoom input. New Game and Restart, including the Victory action,
+  restore fit. Pause duration remains excluded from elapsed time.
+- Zoom leaves the cell allocation/layout, player, seed and move count intact.
+
+Fit, maximum zoom, tracked middle/exit positions, continued play at minimum
+size, enlarged-window play, Help and Victory renders were reviewed. Controls
+and Help fit the minimum window. These synthetic-event/render checks do not
+replace the outstanding manual QA sweep or actual Test Explorer UI execution.

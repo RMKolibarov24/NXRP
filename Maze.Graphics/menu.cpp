@@ -118,7 +118,7 @@ Menu::Menu(const sf::Font& font)
         text->setFillColor(textColor);
     for (auto* text : { &subtitle_, &message_, &sizeSummary_, &victoryStatistics_, &victorySeed_ })
         text->setFillColor(mutedColor);
-    rules_.setLineSpacing(1.3f);
+    rules_.setLineSpacing(1.1f);
     seedField_.setFillColor({ 30, 37, 49 });
     seedField_.setOutlineThickness(1.f);
     showMain();
@@ -155,6 +155,7 @@ void Menu::resize(sf::Vector2u size)
         "Walls and maze edges block movement.\n"
         "Esc opens the menu; Continue resumes the same game.\n"
         "R restarts the same maze at the start.\n"
+        "Mouse wheel or +/- zooms. 0 fits the maze.\n"
         "Choose size and an optional seed in Settings.\n"
         "After winning: Restart maze, New Game or Main menu.", font_, 20, width - 112.f));
     rules_.setOrigin({ 0.f, 0.f });

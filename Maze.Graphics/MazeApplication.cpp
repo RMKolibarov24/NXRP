@@ -164,7 +164,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         if (canContinue())
         {
             game_.phase = GamePhase::Playing;
-            gameView_.reset();
+            gameView_.resetFeedback();
         }
         break;
     case MenuAction::Exit:

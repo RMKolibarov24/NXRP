@@ -72,6 +72,7 @@
   <ItemGroup>
     <ClInclude Include="menu.h" />
     <ClInclude Include="GameView.h" />
+    <ClInclude Include="MazeViewport.h" />
     <ClInclude Include="GameStatisticsText.h" />
     <ClInclude Include="MazeApplication.h" />
     <ClInclude Include="ExecutablePath.h" />
