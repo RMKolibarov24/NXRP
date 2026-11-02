@@ -1,7 +1,14 @@
 # Final local validation
 
+Current handover: **2 November 2026**, source `cf3de4f`. The latest recorded
+regression passed **109/109 Native tests in Debug and Release / x64**. The
+expanded QA workbook records **139 cases: 136 Passed, 0 Failed, 3 Not Run**.
+See the [current QA guide](../QA/README.md) for methods, evidence and pending
+manual/environment checks. This documentation update changes no application
+or Native Unit Test source.
+
 The original base-project validation below records `44d251e`. Feature-specific
-checks appear at the end and do not replace its archived evidence.
+checks and the final handover checks follow it and retain the earlier evidence.
 
 Validation date: **31 October 2026**.
 Source baseline: `44d251e215951517147ecfbb09f292fb42eefa29` on `dev`.
@@ -65,8 +72,8 @@ checks; the presentation was not opened in the native PowerPoint UI.
 - Opening the workbook in the native Excel UI remains unverified.
 - At this base-project snapshot, preferences and the session lasted only in
   memory. The preference-persistence check below records the subsequent change.
-  Seed entry, timer, move count, same-layout restart and zoom remain outside the
-  implemented interface.
+  Seed entry, timer, move count, same-layout restart and zoom were outside that
+  earlier interface; the later feature checks below cover their implementation.
 
 The documentation does not claim that the pending manual checks passed.
 
@@ -303,3 +310,41 @@ Earlier evidence remains unchanged. QA-013, QA-014 and QA-015 remain Not Run;
 native Excel UI opening and system-clipboard paste remain unverified. These
 console/synthetic-event checks do not replace actual manual or Test Explorer
 UI execution. QA preparation is assigned to NKPeshev24's manual commit.
+
+## Current documentation and defense handover
+
+Date: **2 November 2026**, source `cf3de4f8ef06311237cffbd027a040b0f8fee0b2`.
+Production and Native test sources still match the hashes recorded by the
+`9fd92aa` feature regression. This step refreshes the README, technical guide,
+algorithm diagrams, presenter notes and actual editable PowerPoint file.
+
+The presentation retains ten slides, the reference slide size and Arial theme.
+Its architecture, memory-ownership and generation diagrams remain editable.
+The three tables on slides 6, 8 and 10 remain native PowerPoint tables. Current
+regression renders show zoom, seed Settings and the complete Victory controls.
+Every slide has updated speaker notes that match the Markdown presenter notes.
+
+File checks passed package integrity, declared slide size/count, font policy,
+native-table presence and import into the presentation engine. Every slide was
+rendered again from the validated final file and reviewed individually against
+the original. No geometry or font-policy findings were reported. These checks
+do not establish native PowerPoint UI behavior.
+
+The documentation now covers preference persistence, current/selected seeds,
+same-maze restart, elapsed time, accepted-move counts and camera clipping.
+The added phase, time and camera diagrams were cross-checked against the actual
+controller and logic. File/resource references and relative documentation links
+resolve. The maintenance guide explains which project owns each kind of feature
+and keeps CMake limited to SFML preparation.
+
+A private probe generated the **10 by 10, seed-zero** demo with the real Logic
+library, found an independent BFS route and followed it through tryMove. The
+route reaches `(9,9)` with **42 successful moves**. A boundary request adds no
+move, and repeating the route after Restart succeeds with the same allocation
+and seed. The presenter notes list all 42 presses in grouped directions. Exact
+layouts remain dependent on the generator and standard-library toolchain.
+
+Existing QA workbook/evidence files and original validation reports are
+unchanged. The three pending manual/environment cases and the native Excel,
+PowerPoint and clipboard UI limits still apply. Temporary deck builders,
+validation receipts, previews and the demo probe stay outside the repository.

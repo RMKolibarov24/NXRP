@@ -3,7 +3,7 @@
 A Windows maze game built with C++17 and SFML 3.1.0. Choose a grid from 10 to
 50 rows and columns, move with the arrow keys, and reach the green exit.
 
-![The 10 by 10 game board](QA/Evidence/Board-10-minimum.png)
+![The current 50 by 50 game board at 400% zoom](QA/Evidence/FeatureRegression-20261101/Board-zoom-400-minimum.png)
 
 ## Requirements
 
@@ -113,7 +113,7 @@ keeps the player's cell visible. Zoom changes no maze cells or move counts.
 | `Maze.Data/` | Static library containing grid ownership, cells, dimensions, positions and game state. |
 | `Maze.Logic/` | Static library containing validation, generation, movement and session operations. Depends on Data. |
 | `Maze.Graphics/` | SFML application, event loop, menu pages, controller, board rendering and resource paths. Depends on Logic and Data. |
-| `Maze.UnitTest/` | Microsoft Native Unit Test DLL using the real Data and Logic code. |
+| `Maze.UnitTest/` | Microsoft Native Unit Test DLL using Data/Logic and the SFML-free camera calculations. |
 | `ProjectDefaults.props` | Shared C++17 compiler settings and output directories. |
 | `dependencies/` | CMake setup for SFML 3.1.0 and the generated property-sheet template. |
 | `assets/fonts/` | Bundled Source Sans 3 Semibold font and its license. |
@@ -123,6 +123,12 @@ keeps the player's cell visible. Zoom changes no maze cells or move counts.
 Add source files with **Add > New Item / Existing Item** in the relevant project.
 Include the resulting `.vcxproj` and `.vcxproj.filters` changes in your commit.
 Build products, dependency downloads and `.vs/` caches stay ignored.
+
+The `Maze.*` folders above contain the maintained source projects. `build/`
+contains generated outputs and the SFML dependency build; it is recreated by
+the setup script and Visual Studio. The `.vcxproj` files in the source folders
+stay in Git. Adding application files through Visual Studio does not require
+regenerating the solution with CMake.
 
 ## Native unit tests
 
@@ -147,19 +153,26 @@ MSBuild NXRP.slnx /p:Configuration=Release /p:Platform=x64
 
 The suite checks ownership and bounds, movement and victory, session replacement/restart,
 preference round-trips, malformed/unwritable files, game time and successful moves,
-fixed-seed repeatability, camera bounds/player tracking and independently verified reachability for all 1,681
-allowed size pairs. [QA results](QA/README.md) distinguish CLI runs, UI observations
+fixed-seed repeatability, camera bounds/player tracking and independently verified
+reachability for all 1,681 allowed size pairs. [QA results](QA/README.md) distinguish CLI runs, UI observations
 and checks that remain unrun. [Final validation](docs/VALIDATION.md) records the
 documentation-stage rebuild and subsequent feature checks.
 
 ## Documentation
 
 - [Technical documentation](docs/TECHNICAL.md): architecture, data and memory,
-  generation, movement, session lifecycle and test design.
-- [Algorithm diagrams](docs/ALGORITHMS.md): generation and movement flowcharts.
+  generation, movement, session lifecycle, test design and where to add features.
+- [Algorithm diagrams](docs/ALGORITHMS.md): generation, movement, ownership,
+  game phases, elapsed time and camera calculations.
 - [Defense presentation](docs/NXRP_Defense.pptx): 10 editable slides with speaker notes,
-  describing the completed base project at `44d251e`, before preference persistence.
-- [Presenter notes](docs/PRESENTATION_NOTES.md): slide notes and a short demonstration route.
+  covering preferences, restart, statistics, seed replay, zoom and current QA evidence.
+- [Presenter notes](docs/PRESENTATION_NOTES.md): matching slide notes and a verified
+  10 by 10, seed-zero demonstration route.
+
+The latest QA pass records **109/109 Native tests in each x64 configuration**.
+Its workbook has 139 cases: 136 Passed, 0 Failed and 3 Not Run, with current
+Native/controller results separated from the original GUI observations.
+The pending manual/environment checks are listed in the QA guide.
 
 ## Troubleshooting
 

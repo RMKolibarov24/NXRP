@@ -2,6 +2,8 @@
 
 These Mermaid flowcharts describe the implemented functions and render directly
 on GitHub. The defense presentation also contains an editable generation diagram.
+Updated for source `cf3de4f` on **2 November 2026**. The production implementation
+matches the `9fd92aa` feature-regression source.
 
 ## Maze generation
 
@@ -44,7 +46,7 @@ flowchart TD
     C -- Yes --> D["Compute one-cell target"]
     D --> E{"Target in bounds<br/>and Passage or Exit?"}
     E -- No --> X
-    E -- Yes --> F["Update player position"]
+    E -- Yes --> F["Update player position<br/>Increment successful moves with saturation"]
     F --> G{"At bottom-right Exit?"}
     G -- No --> H(["Return Moved"])
     G -- Yes --> I["Set phase Won"]
@@ -52,7 +54,8 @@ flowchart TD
 ```
 
 All checks that can reject a move precede the position update. Movement takes
-O(1) time and uses no grid allocation.
+O(1) time and uses no grid allocation. The winning step counts once. Time is
+accounted for by the controller before this operation, as shown below.
 
 ## New Game ownership
 
@@ -62,14 +65,17 @@ sequenceDiagram
     participant Gen as generateMaze
     participant Rules as startGame
     participant State as GameState
-    UI->>Gen: selectedSize
+    UI->>UI: Choose selectedSeed or obtain one random seed
+    UI->>Gen: selectedSize, usedSeed
     alt Generation succeeds
         Gen-->>UI: prepared MazeGrid
-        UI->>Rules: game, move(prepared)
+        UI->>Rules: game, move(prepared), usedSeed
         Rules->>Rules: Validate complete layout
         alt Valid layout
-            Rules->>State: Move in grid, reset position, set Playing
+            Rules->>State: Move grid, record seed, reset player/statistics, set Playing
             State->>State: Release previous array
+            Rules-->>UI: Started
+            UI->>UI: Reset feedback and fit the board
         else Validation error
             Rules-->>UI: Exception
             UI->>UI: Show error, preserve old session
@@ -82,3 +88,79 @@ sequenceDiagram
 
 The rvalue reference parameter alone does not transfer ownership. startGame
 performs the move only after layout validation succeeds.
+The optional seed choice distinguishes random mode from fixed seed zero.
+The controller obtains random entropy once and records the exact seed used.
+
+## Game phases and restart
+
+Implementation: `Maze.Logic/Maze.Game.cpp`, `Maze.Graphics/MazeApplication.cpp`.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Menu
+    Menu --> Playing: New Game succeeds
+    Playing --> Paused: Escape
+    Paused --> Playing: Continue
+    Playing --> Won: Enter bottom-right Exit
+    Playing --> Playing: Restart
+    Paused --> Playing: Restart or New Game
+    Won --> Playing: Restart or New Game
+    Playing --> Menu: Exit releases the grid
+    Paused --> Menu: Exit releases the grid
+    Won --> Menu: Exit releases the grid
+```
+
+Menu here means the empty initial/endGame phase. Menu pages and game phases are
+separate: Help/Settings leave an unfinished session Paused, while returning to
+the menu after victory keeps Won. Continue requires an unfinished nonempty game.
+Exit then closes the window. Restart resets position/statistics and fits the
+view without allocating or changing cells, current seed or next-game choices.
+New Game generates and validates a replacement. Both reset the session's results.
+
+## Elapsed time before an event or update
+
+Implementation: `MazeApplication::updateTime` and `advanceGameTime`.
+
+```mermaid
+flowchart TD
+    A["Read injected or steady-clock timestamp"] --> B{"Later than previousTick?"}
+    B -- No --> F["Apply event or update the page"]
+    B -- Yes --> C["Compute positive elapsed duration"]
+    C --> D{"Old phase Playing<br/>and maze nonempty?"}
+    D -- Yes --> E["Add duration to statistics<br/>Saturate at maximum"]
+    D -- No --> G["Keep elapsed time unchanged"]
+    E --> H["Set previousTick to the new timestamp"]
+    G --> H
+    H --> F
+```
+
+This ordering includes active time up to Escape or the winning move. It excludes
+the paused interval before Continue. Equal/earlier timestamps do not move the
+clock anchor backwards. The model retains fractional time; only display text
+uses total minutes and seconds. Logic takes a duration and never reads a clock.
+
+## Zoom and player tracking
+
+Implementation: `Maze.Graphics/MazeViewport.h` and `Maze.Graphics/GameView.cpp`.
+
+```mermaid
+flowchart TD
+    A["Playing input: wheel over board or +/-<br/>0 or Home selects fit"] --> B["Clamp zoom level to 1 through 4"]
+    B --> C{"Valid dimensions<br/>and finite area larger than border padding?"}
+    C -- No --> X["Skip board drawing"]
+    C -- Yes --> D["Compute fitted integer cell size<br/>Reserve two pixels on each side"]
+    D --> E{"Fitted cell at least two pixels?"}
+    E -- No --> X
+    E -- Yes --> F["Multiply by zoom level<br/>Compute world dimensions"]
+    F --> G{"Finite world dimensions?"}
+    G -- No --> X
+    G -- Yes --> H["For each axis: center if it fits<br/>otherwise follow player and clamp to edges"]
+    H --> I["Save caller view<br/>Set board viewport and scissor"]
+    I --> J["Draw grid and player in world coordinates"]
+    J --> K["Restore caller view"]
+```
+
+The board clips to its own area and leaves the HUD in pixel coordinates.
+Continue and resize retain zoom; New Game and Restart return to fit. Zoom does
+not change model cells, seed, position or successful-move count. Invalid or
+overflowed geometry returns no drawable layout before GameView changes its view.

@@ -2,6 +2,8 @@
 
 This document describes the implemented C++17 Windows application. The four
 Visual Studio projects form the maintained solution in `NXRP.slnx`.
+Documentation snapshot: `cf3de4f`, updated **2 November 2026**. Its production
+code matches the gameplay source `9fd92aa` used by the latest QA evidence.
 
 ## Architecture
 
@@ -16,17 +18,21 @@ flowchart LR
 ```
 
 Arrows indicate project/library dependencies. Data and Logic contain no SFML
-dependency. Tests reference Data and Logic and open no game window. There are
-no circular project references.
+dependency. Tests reference Data and Logic and open no game window. The native
+camera tests also include the SFML-free `Maze.Graphics/MazeViewport.h` directly;
+they add no Graphics project reference or SFML link dependency. There are no
+circular project references.
 
 | Component | Responsibility |
 | --- | --- |
 | `main.cpp` | Load the font, create the window, poll events, update hover state and render frames. |
-| `MazeApplication` | Own GameState and route events between gameplay and menu pages. |
+| `MazeApplication` | Own GameState, account for elapsed time, manage preferences and route events between gameplay and menu pages. |
 | `Menu` | Display Main, How to Play, Settings and Victory pages, and return MenuAction values. |
-| `GameView` | Translate arrow events into logic calls, draw cells/player and show movement feedback. |
-| `Maze.Game` | Start/restart/end sessions, validate prepared layouts, apply movement and detect victory. |
-| `Maze.Generation` | Create a connected random grid with an optional test seed. |
+| `GameView` | Route movement/zoom input, draw the board and display seed, coordinates, statistics and feedback. |
+| `MazeViewport` | Compute bounded zoom, full-map fit and player tracking without SFML types. |
+| `GameStatisticsText` | Format the shared gameplay/Victory time and move text. |
+| `Maze.Game` | Start/restart/end sessions, validate layouts, apply movement/time, count accepted steps and detect victory. |
+| `Maze.Generation` | Generate connected grids, obtain random seeds and parse the user-selected replay seed. |
 | `Maze.Settings` | Load/save validated next-game dimensions through a supplied filesystem path. |
 | `SettingsPath` | Resolve the current Windows user's local app-data settings path. |
 | `MazeGrid` | Own the dynamic cell array and provide checked access. |
@@ -71,7 +77,8 @@ Copy construction and assignment are deleted. Move operations transfer the
 array and leave the source with zero dimensions and no storage. Move assignment
 releases the previous destination array. Destruction automatically invokes
 `delete[]` through unique_ptr. `endGame` replaces the grid with an empty MazeGrid,
-resets the player/phase and preserves the selected next-game size.
+resets the player/phase and statistics, clears the current seed, and preserves
+the selected next-game size and seed choice.
 
 This ownership model avoids a separate manual deletion path for every page
 transition. Its storage cost is O(rows * cols). Native tests cover moved-from
@@ -115,8 +122,9 @@ walkable, and the player has not already reached the exit. It computes one
 candidate coordinate, checks bounds, then checks whether the target cell is
 Passage or Exit. Unknown direction values also return Blocked.
 
-A blocked request preserves position and phase. A legal request updates the
-position. If the target is the bottom-right Exit, it also sets GamePhase::Won.
+A blocked request preserves position, phase and successful-move count. A legal
+request updates position and increments that count without overflow. If the
+target is the bottom-right Exit, it also sets GamePhase::Won.
 `hasWon` checks the actual position and cell, separately from the phase.
 Each movement request takes O(1) time.
 
@@ -133,22 +141,22 @@ generator and independent reachability tests establish a path to the exit.
 If validation fails, the old session and the supplied grid remain unchanged.
 After successful validation, startGame moves in the prepared array, records the
 supplied seed (or clears stale metadata for an unseeded fixture), updates the
-selected size to its dimensions, resets the player and enters Playing.
+selected size to its dimensions, resets player/statistics and enters Playing.
 The GUI prepares the entire new random maze before calling startGame. Generation
 or validation errors therefore preserve the old session and show an error message.
 
 | Action | State and ownership behavior |
 | --- | --- |
 | New Game | Generate using the selected dimensions and seed/mode, validate the replacement, release the previous owned grid, reset player/statistics and enter Playing. |
-| Restart maze / R | Reset player and statistics, then enter Playing. Keep every cell, the grid allocation and the selected next-game size. |
+| Restart maze / R | Reset player/statistics and fit the view, then enter Playing. Keep every cell, allocation, current seed and selected next-game preferences. |
 | Escape during play | Set Paused and show the main menu. Keep the grid and player. |
-| Continue | Enter Playing with the same grid/player. Available only for an unfinished Playing/Paused session. |
+| Continue | Enter Playing with the same grid, player, seed, statistics and zoom. Available only for an unfinished Playing/Paused session. |
 | Help or Settings | Display a menu page while preserving the paused session. |
 | Apply Settings | Validate dimensions/seed, store both choices in memory, and save dimensions to the settings file. Keep the current grid/seed. On a write failure, keep the choices for this launch and show a message. |
 | Back/Escape from Settings | Discard the draft by returning without applying it. |
 | Reach the exit | Set Won and display the Victory page. Continue becomes unavailable. |
 | Main menu after victory | Show the menu while retaining Won and its completed grid until replacement or exit. |
-| Exit/window close | endGame releases the grid, resets player/phase, then closes the window. |
+| Exit/window close | endGame releases the grid, clears current seed/statistics, resets player/phase, then closes the window. |
 
 `hasActiveGame()` reports nonempty storage, including a completed maze. The
 controller's `canContinue()` additionally checks the phase, so a completed maze
@@ -167,7 +175,7 @@ pages. It resets GameView's movement feedback after success. The restart shortcu
 is inactive on Help and Settings; text input edits the focused Seed field.
 The restart button remains disabled until a session exists. A completed maze
 can restart even though Continue is disabled. New Game still uses the selected
-dimensions and calls the random generator.
+dimensions and selected seed/mode when calling the generator.
 
 ## Seed selection and replay
 
@@ -253,7 +261,8 @@ API references: [Windows known-folder lookup](https://learn.microsoft.com/en-us/
 
 The window starts at 900 by 600 and enforces a minimum of 640 by 560. GameView
 reserves space for the title, legend and status text, then computes an integer
-cell size that fits both dimensions, with space for the border. It centers the grid in the remaining area.
+cell size that initially fits both dimensions, with space for the border.
+It centers the fitted grid in the remaining area.
 It draws all cells as one triangle vertex batch and overlays the player marker.
 Large grids use the same model and movement rules. Small cells omit S/E text
 labels while retaining distinct exit/player colors.
@@ -313,11 +322,40 @@ routes through the real tryMove API to victory. One test covers all 41 * 41 =
 the maximum 32-bit unsigned value. Tests on unseeded maps require valid results,
 without assuming that consecutive random outputs always differ.
 
-The [QA guide](../QA/README.md) records 78 distinct cases and keeps execution
-methods visible. A native case has separate Debug and Release result steps.
-Controller probes and live GUI observations are separate evidence types.
-Test Explorer UI execution remains unverified even when VSTest console succeeds.
-See [validation](VALIDATION.md) for the final local checks and limitations.
+The [QA guide](../QA/README.md) records 139 distinct cases: 109 current Native
+cases, 15 current Controller scenarios and 15 archived GUI/manual cases. The
+recorded total is 136 Passed, 0 Failed and 3 Not Run. Each Native case has
+separate Debug/Release steps with its actual runner duration; both complete
+109-test runs passed on 1 November 2026 UTC. The Controller group covers the
+added features in both configurations. Archived GUI observations retain their
+original `44d251e` source and dates. Test Explorer UI execution remains
+unverified even when VSTest console succeeds. See [validation](VALIDATION.md)
+for the checks, evidence and remaining limits.
+
+## Adding further features
+
+Keep the four maintained Visual Studio projects. Add files with **Add > New Item**
+or **Add > Existing Item** in the project that owns their responsibility, and
+include its `.vcxproj` and `.vcxproj.filters` changes. CMake prepares SFML only.
+
+| Kind of change | Where it belongs | Verification |
+| --- | --- | --- |
+| Grid or session data | Data, with explicit ownership and defaults | Native state/ownership tests |
+| A movement rule or game operation | Logic, independent of SFML input events | Native accepted/rejected/boundary cases |
+| A menu page, shortcut or display | Graphics: Menu, MazeApplication or GameView | Controller transitions and rendering at minimum size |
+| Camera behavior | MazeViewport and GameView | Native geometry plus clipped rendering/player visibility |
+| Saved preferences | Maze.Settings; Windows path lookup stays in Graphics | Isolated file round-trips/failure cases and controller loading |
+
+Keep current-session values separate from next-game choices. A Settings change
+must not silently replace a paused maze. Preserve the existing timing order:
+account for the old phase before applying an event. Keep UI zoom out of the
+game rules and restore the render target's view after drawing the board.
+
+Build the affected x64 configurations, run the relevant Native tests and record
+fresh QA evidence for changed behavior. Retain earlier evidence with its source
+revision and execution method. Update the public controls, diagrams and demo
+notes when behavior changes. Generated downloads, binaries, caches and temporary
+verification tools do not belong in tracked source folders.
 
 ## Implemented scope and remaining limits
 
@@ -339,8 +377,8 @@ file and renders; they do not establish native PowerPoint behavior.
 | Participant | Confirmed responsibility |
 | --- | --- |
 | RMKolibarov24 | Solution setup, dependency integration, documentation and defense materials. |
-| HAMihaylov24 | Dynamic data model, movement/game rules, random generation implementation and session/resource lifecycle. |
-| PDKapralev24 | SFML menu, board rendering, keyboard integration and screen transitions. |
+| HAMihaylov24 | Dynamic data model, movement/game rules, random generation, seed replay and session/resource lifecycle. |
+| PDKapralev24 | SFML menu, board rendering, keyboard integration, screen transitions and zoom. |
 | NKPeshev24 | Native test coverage and QA review. |
 
 These describe development areas and review ownership. Git commit authorship and
