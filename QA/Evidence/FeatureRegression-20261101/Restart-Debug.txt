@@ -1,0 +1,2 @@
+PASS 10x10 at 900x600: gameplay/main/victory shortcuts and buttons; layout/allocation/preferences preserved; no-session, Help/Settings guards; New Game and Exit.
+PASS 50x50 at 640x560: gameplay/main/victory shortcuts and buttons; layout/allocation/preferences preserved; no-session, Help/Settings guards; New Game and Exit.

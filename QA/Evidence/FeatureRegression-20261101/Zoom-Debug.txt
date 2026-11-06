@@ -1,0 +1,4 @@
+PASS component 10x10: zoom bounds, wheel/keys, fit, player tracking, resize, unchanged model, pixel-exact HUD clipping and view/scissor restoration.
+PASS component 50x50: zoom bounds, wheel/keys, fit, player tracking, resize, unchanged model, pixel-exact HUD clipping and view/scissor restoration.
+PASS application 10x10: Continue keeps zoom; Help/Settings ignore zoom; resize keeps player visible; New Game/Restart/victory reset fit; timing and moves preserved.
+PASS application 50x50: Continue keeps zoom; Help/Settings ignore zoom; resize keeps player visible; New Game/Restart/victory reset fit; timing and moves preserved.

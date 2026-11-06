@@ -1,0 +1,5 @@
+
+  Maze.Data.vcxproj -> C:\Users\rafat\source\repos\NXRP\build\lib\Debug\Maze.Data.lib
+  Maze.Logic.vcxproj -> C:\Users\rafat\source\repos\NXRP\build\lib\Debug\Maze.Logic.lib
+  Maze.UnitTest.vcxproj -> C:\Users\rafat\source\repos\NXRP\build\bin\Debug\Maze.UnitTest.dll
+  Maze.Graphics.vcxproj -> C:\Users\rafat\source\repos\NXRP\build\bin\Debug\Maze.Graphics.exe

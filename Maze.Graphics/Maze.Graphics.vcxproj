@@ -45,11 +45,17 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Link>
+      <AdditionalDependencies>shell32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);$(NXRPRepoRoot)Maze.Data;$(NXRPRepoRoot)Maze.Logic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Link>
+      <AdditionalDependencies>shell32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);$(NXRPRepoRoot)Maze.Data;$(NXRPRepoRoot)Maze.Logic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -58,14 +64,19 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="menu.cpp" />
     <ClCompile Include="GameView.cpp" />
+    <ClCompile Include="GameStatisticsText.cpp" />
     <ClCompile Include="MazeApplication.cpp" />
     <ClCompile Include="ExecutablePath.cpp" />
+    <ClCompile Include="SettingsPath.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="menu.h" />
     <ClInclude Include="GameView.h" />
+    <ClInclude Include="MazeViewport.h" />
+    <ClInclude Include="GameStatisticsText.h" />
     <ClInclude Include="MazeApplication.h" />
     <ClInclude Include="ExecutablePath.h" />
+    <ClInclude Include="SettingsPath.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Maze.Data\Maze.Data.vcxproj">

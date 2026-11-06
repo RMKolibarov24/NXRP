@@ -1,7 +1,11 @@
 #pragma once
 
 #include "MazeGrid.h"
+#include "GameStatistics.h"
 #include "MazePosition.h"
+
+#include <cstdint>
+#include <optional>
 
 enum class GamePhase
 {
@@ -17,6 +21,9 @@ struct GameState
     MazeSize selectedSize{ MIN_MAZE_SIZE, MIN_MAZE_SIZE };
     MazePosition player;
     GamePhase phase = GamePhase::Menu;
+    GameStatistics statistics;
+    std::optional<std::uint32_t> selectedSeed; // Empty means a random next game.
+    std::optional<std::uint32_t> mazeSeed;     // Seed used by the current generated grid.
 
     bool hasActiveGame() const noexcept
     {

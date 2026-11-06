@@ -1,0 +1,497 @@
+{
+  "sourceCommit": "9fd92aa1a9cb2f664ef20868901deb7806aaa762",
+  "branch": "dev",
+  "sourceWorkingTreeCleanAtExecution": true,
+  "runDateUtc": "2026-11-01",
+  "reviewDateEuropeSofia": "2026-11-02",
+  "platform": "Windows x64; Visual Studio 2026 Community; MSVC v145; C++17; SFML 3.1.0",
+  "buildsAndNativeTests": [
+    {
+      "configuration": "Debug",
+      "startedUtc": "2026-11-01T21:53:07.8155144+00:00",
+      "finishedUtc": "2026-11-01T21:53:09.9506901+00:00",
+      "build": "Passed",
+      "total": 109,
+      "passed": 109,
+      "failed": 0
+    },
+    {
+      "configuration": "Release",
+      "startedUtc": "2026-11-01T21:53:09.9549349+00:00",
+      "finishedUtc": "2026-11-01T21:53:11.1687919+00:00",
+      "build": "Passed",
+      "total": 109,
+      "passed": 109,
+      "failed": 0
+    }
+  ],
+  "nativeClassCounts": {
+    "MazeUnitTest.GameStateTests": 3,
+    "MazeUnitTest.GameStatisticsTests": 10,
+    "MazeUnitTest.MazeGenerationTests": 11,
+    "MazeUnitTest.MazeGridTests": 13,
+    "MazeUnitTest.MazeMovementTests": 20,
+    "MazeUnitTest.MazeSeedTests": 10,
+    "MazeUnitTest.MazeSessionTests": 12,
+    "MazeUnitTest.MazeSettingsTests": 12,
+    "MazeUnitTest.MazeSizeTests": 10,
+    "MazeUnitTest.MazeViewportTests": 8
+  },
+  "controllerRuns": [
+    {
+      "configuration": "Debug",
+      "feature": "Preferences",
+      "startedUtc": "2026-11-01T21:54:09.7570033+00:00",
+      "finishedUtc": "2026-11-01T21:54:15.5134538+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Debug",
+      "feature": "Restart",
+      "startedUtc": "2026-11-01T21:54:15.5192882+00:00",
+      "finishedUtc": "2026-11-01T21:54:19.9537957+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Debug",
+      "feature": "Statistics",
+      "startedUtc": "2026-11-01T21:54:19.9555540+00:00",
+      "finishedUtc": "2026-11-01T21:54:23.8187089+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Debug",
+      "feature": "Seed",
+      "startedUtc": "2026-11-01T21:54:23.8202268+00:00",
+      "finishedUtc": "2026-11-01T21:54:28.1901721+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Debug",
+      "feature": "Zoom",
+      "startedUtc": "2026-11-01T21:54:28.1919819+00:00",
+      "finishedUtc": "2026-11-01T21:54:33.0125700+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Release",
+      "feature": "Preferences",
+      "startedUtc": "2026-11-01T21:54:33.0142538+00:00",
+      "finishedUtc": "2026-11-01T21:54:38.0621980+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Release",
+      "feature": "Restart",
+      "startedUtc": "2026-11-01T21:54:38.0640069+00:00",
+      "finishedUtc": "2026-11-01T21:54:41.6258028+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Release",
+      "feature": "Statistics",
+      "startedUtc": "2026-11-01T21:54:41.6278165+00:00",
+      "finishedUtc": "2026-11-01T21:54:45.1625130+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Release",
+      "feature": "Seed",
+      "startedUtc": "2026-11-01T21:54:45.1642515+00:00",
+      "finishedUtc": "2026-11-01T21:54:48.8060867+00:00",
+      "result": "Passed"
+    },
+    {
+      "configuration": "Release",
+      "feature": "Zoom",
+      "startedUtc": "2026-11-01T21:54:48.8074006+00:00",
+      "finishedUtc": "2026-11-01T21:54:52.6700348+00:00",
+      "result": "Passed"
+    }
+  ],
+  "controllerMethod": "Private probes compile the real Graphics sources and link Data/Logic. Synthetic SFML events, isolated settings files, hidden windows, independent BFS paths and offscreen rendering. Statistics use injected monotonic timestamps.",
+  "controllerProbeAdaptations": "Older preference/restart/statistics probe coordinates updated for the six-item main menu and seed field. Production sources were not changed.",
+  "probes": [
+    {
+      "file": "verify-preferences.cpp",
+      "sha256": "6a954ea5486e950ef1d26c978c0607dd626a4a9f666f588c75adc59d02817210"
+    },
+    {
+      "file": "verify-restart.cpp",
+      "sha256": "5739f0e0e4dfbaf5e9918051ed54b4710ee5191bc17515cfd1f9564ac01eb757"
+    },
+    {
+      "file": "verify-seed.cpp",
+      "sha256": "29b4cd2ab84fab45e4166c5e5984b1166bc1ce9ca183019e32a41ea3bf6b2bc9"
+    },
+    {
+      "file": "verify-statistics.cpp",
+      "sha256": "35d264a9021ba30009a9be39bbe186abb6f7c6f638f78c31ed7542f7176e476a"
+    },
+    {
+      "file": "verify-zoom.cpp",
+      "sha256": "297c1809f639af10578ea2afe4f655eb1cd8f9c4fd88425e97f34a776f101109"
+    }
+  ],
+  "workbook": {
+    "cases": 139,
+    "passed": 136,
+    "failed": 0,
+    "notRun": 3,
+    "native": 109,
+    "archivedGui": 15,
+    "currentController": 15
+  },
+  "pending": [
+    "QA-013 full manual hover/click sweep",
+    "QA-014 second clean-machine setup",
+    "QA-015 actual Visual Studio Test Explorer UI"
+  ],
+  "nativeExcelUiVerified": false,
+  "clipboardPasteUiVerified": false,
+  "captures": [
+    {
+      "file": "Main-menu-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Restart/renders/large/main-empty.png"
+    },
+    {
+      "file": "Help-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Zoom/renders/large-application/help.png"
+    },
+    {
+      "file": "Settings-seed-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Seed/renders/large/settings-maximum.png"
+    },
+    {
+      "file": "Settings-invalid-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Seed/renders/large/settings-invalid.png"
+    },
+    {
+      "file": "Board-fit-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Zoom/renders/large-component/fit.png"
+    },
+    {
+      "file": "Board-zoom-400-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Zoom/renders/large-component/zoom-400.png"
+    },
+    {
+      "file": "Board-tracked-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Zoom/renders/large-component/middle-tracked.png"
+    },
+    {
+      "file": "Statistics-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Statistics/renders/large/active-statistics.png"
+    },
+    {
+      "file": "Victory-minimum.png",
+      "configuration": "Debug",
+      "size": "640x560",
+      "method": "Actual SFML offscreen render",
+      "source": "Statistics/renders/large/victory-statistics.png"
+    }
+  ],
+  "evidence": [
+    {
+      "file": "Native-Debug.trx",
+      "sha256": "870e9bcdddca6211750899f33b36e9febe1501e01d4e347b1a8c0d33f1ee8121"
+    },
+    {
+      "file": "Build-Debug.txt",
+      "sha256": "7466d3cc91b498876201b16a00c299d5530918d73045b9f45c83c98593e33375"
+    },
+    {
+      "file": "Preferences-Debug.txt",
+      "sha256": "032b064f889ff3f20c7229d4430d9a194a5c0a5bdef312c7d69bff44ef4738fd"
+    },
+    {
+      "file": "Restart-Debug.txt",
+      "sha256": "d53f7f968762d49d245e95a69875899552ffaf3be31d9ccd4285bd304dd95f32"
+    },
+    {
+      "file": "Statistics-Debug.txt",
+      "sha256": "c7c88c394bc5dc3f924f2e86bbdd14b659eb399b5b0eff0b4a346e479da53c88"
+    },
+    {
+      "file": "Seed-Debug.txt",
+      "sha256": "38fe7454031aec8db52c2159b731bb8f72b5651e53acd7865c63407c35a44ecc"
+    },
+    {
+      "file": "Zoom-Debug.txt",
+      "sha256": "615a79f0b3e4642142fabdfa76ce1aae3dce21a4c9507517cb2684fbe79e6604"
+    },
+    {
+      "file": "Native-Release.trx",
+      "sha256": "214e2a8c384b6fda4c0ce5b9840638aba6b4a65502aef38e59c9a41a0fad1bf1"
+    },
+    {
+      "file": "Build-Release.txt",
+      "sha256": "b8bfa5bd05574501b09cf8bb8733741ae4f474c65526866cf1402721e3ec4266"
+    },
+    {
+      "file": "Preferences-Release.txt",
+      "sha256": "d3b14e20d36c2e55e9a728329a08bed70de1db6923f6010051796b403f5d3f77"
+    },
+    {
+      "file": "Restart-Release.txt",
+      "sha256": "d53f7f968762d49d245e95a69875899552ffaf3be31d9ccd4285bd304dd95f32"
+    },
+    {
+      "file": "Statistics-Release.txt",
+      "sha256": "c7c88c394bc5dc3f924f2e86bbdd14b659eb399b5b0eff0b4a346e479da53c88"
+    },
+    {
+      "file": "Seed-Release.txt",
+      "sha256": "38fe7454031aec8db52c2159b731bb8f72b5651e53acd7865c63407c35a44ecc"
+    },
+    {
+      "file": "Zoom-Release.txt",
+      "sha256": "615a79f0b3e4642142fabdfa76ce1aae3dce21a4c9507517cb2684fbe79e6604"
+    },
+    {
+      "file": "Main-menu-minimum.png",
+      "sha256": "cb320656b23c9afe5efcf505b21bfcf355a2e8d00d2ec869de8d772cb99a3aaf"
+    },
+    {
+      "file": "Help-minimum.png",
+      "sha256": "f13e1f67d3c12b85897b65733327d4cd2b810aa9a7eed20808e62340f0ab6214"
+    },
+    {
+      "file": "Settings-seed-minimum.png",
+      "sha256": "a9cfa18be0206a8ac1f77dc1609ce8096207509210b93fecc4a905e7e5ece7f8"
+    },
+    {
+      "file": "Settings-invalid-minimum.png",
+      "sha256": "6dfb4e05b7a7e5c97218ca6057d42c31704b2e27f7cfd4c971831b0e57e62ba9"
+    },
+    {
+      "file": "Board-fit-minimum.png",
+      "sha256": "fc299fee5586384f44b2f65bd76fd5b12dea9f2e5b9fe01946eca74b87bc1f79"
+    },
+    {
+      "file": "Board-zoom-400-minimum.png",
+      "sha256": "0b8834ce7370ac416e086f843a9c468a47a3787af0c0a62d2df48bec83791797"
+    },
+    {
+      "file": "Board-tracked-minimum.png",
+      "sha256": "aebdf701ddb228b11603f9b94a151ce93be9bf3db34dee0926c49162730b817f"
+    },
+    {
+      "file": "Statistics-minimum.png",
+      "sha256": "4cf3ad5936f3a12eaac23173a5e03f0671ca85b09d826f90bb8cc60556e09912"
+    },
+    {
+      "file": "Victory-minimum.png",
+      "sha256": "d0b31fe595e95f1b5aa562e740091087d7b14bc2b7020891731c7b6d82be64eb"
+    }
+  ],
+  "productionAndNativeSources": [
+    {
+      "file": "Maze.Data/GameState.h",
+      "sha256": "4f56006dafff4578369c0b3bbcb70cceeb58f61b43829864c458e12c1052c411"
+    },
+    {
+      "file": "Maze.Data/GameStatistics.h",
+      "sha256": "7154813203d8fdf369d00a73a77e7bf7b6fd6af188c47e5073a3869b5ca2c3a3"
+    },
+    {
+      "file": "Maze.Data/Maze.Data.cpp",
+      "sha256": "d1debca8d804fa01535951cc6aea4f251af3781a3390451edcfd366e35a375e7"
+    },
+    {
+      "file": "Maze.Data/Maze.Data.vcxproj",
+      "sha256": "492be48eaf8415d6dc6edc7f5dc353dee60935a8de68188855b312af64a845a0"
+    },
+    {
+      "file": "Maze.Data/MazeCell.h",
+      "sha256": "ae81777ed2d7489e9fa90ae0f2b8ba84f4111f13e111c618f85d2c07f6fd5a20"
+    },
+    {
+      "file": "Maze.Data/MazeGrid.cpp",
+      "sha256": "74b1fc26b35d47543463f2bb475c1f3189fe307b7cd57de4b29fdb87e3b5d4d1"
+    },
+    {
+      "file": "Maze.Data/MazeGrid.h",
+      "sha256": "735fa8e36d541ecc51654ab9cc3443f89887d1c1889246071e1e66318973bebc"
+    },
+    {
+      "file": "Maze.Data/MazePosition.h",
+      "sha256": "a2ff29b3e930a3e83528ad884b9c35861120633d4b886ebc18beb85ea862e633"
+    },
+    {
+      "file": "Maze.Data/MazeSize.h",
+      "sha256": "f76629478fd2605b8f869e511f7c91d021ada7ee3efffdde62d6bd95bafd6fb5"
+    },
+    {
+      "file": "Maze.Logic/Maze.Game.cpp",
+      "sha256": "bb50cb9934238a3c77c14f2df71f9c2d390458f804163644946097d251485ad7"
+    },
+    {
+      "file": "Maze.Logic/Maze.Game.h",
+      "sha256": "12b7f27f93e254d267a9e7fcd6561c09646b954ad7c982d6c3b3697853ff6827"
+    },
+    {
+      "file": "Maze.Logic/Maze.Generation.cpp",
+      "sha256": "40e8e06c2776f6e28723075ceeb9493a3cc990729ce3359128566acf19e4a315"
+    },
+    {
+      "file": "Maze.Logic/Maze.Generation.h",
+      "sha256": "5a8b392138cdbcb5a7b2b0a7695cc463edd09c2c7701d1fc9b8ed97ef681e475"
+    },
+    {
+      "file": "Maze.Logic/Maze.Logic.cpp",
+      "sha256": "1d0650b31fad3d8168b938fcee3f4c0350e86a926b822e9e3e77caee54146538"
+    },
+    {
+      "file": "Maze.Logic/Maze.Logic.vcxproj",
+      "sha256": "149e0846f47b23dc8cf67161a2f2f0a8decf4ba37bc4d432ee9c3c7b46aa1efa"
+    },
+    {
+      "file": "Maze.Logic/Maze.Settings.cpp",
+      "sha256": "a03b667155cd23c2fafbd80e871fabee5be2158c2899bd6c3acc43105b36c874"
+    },
+    {
+      "file": "Maze.Logic/Maze.Settings.h",
+      "sha256": "00de2b7cebb065f5852d8010f8e85f5ad335ef149f6bba907b86ae6de579a743"
+    },
+    {
+      "file": "Maze.Logic/Maze.Validation.h",
+      "sha256": "9eeafb4a79533f65e2ff7f558a0e0ad4da268a5c0b0d1cb9222dd98aadfd4281"
+    },
+    {
+      "file": "Maze.Graphics/ExecutablePath.cpp",
+      "sha256": "69483f74a48528f75ecbf4a663a38ae30fc44b93dd8a2b45a1913696616631c9"
+    },
+    {
+      "file": "Maze.Graphics/ExecutablePath.h",
+      "sha256": "b7e7c246db5ce61ad90d20c8dec2968569329cd0e7b1043eb2ab0890bb761e03"
+    },
+    {
+      "file": "Maze.Graphics/GameStatisticsText.cpp",
+      "sha256": "029ffdbd152cbd5598450640336b7cd041e1036e85abb31aaaaa08b8db309f8f"
+    },
+    {
+      "file": "Maze.Graphics/GameStatisticsText.h",
+      "sha256": "ece8ab2d4634439812508bfe4525d603aeeffed27ea526f93a5591175457429c"
+    },
+    {
+      "file": "Maze.Graphics/GameView.cpp",
+      "sha256": "a5cd7c9e6d99a36851b2198ff155cccbb0fc129a5b2160d5ee1cf973b35a6350"
+    },
+    {
+      "file": "Maze.Graphics/GameView.h",
+      "sha256": "edf4a9a89a90e7d48f8f180cdbc56c69372fa8ba7c4bb97364819c102898b18c"
+    },
+    {
+      "file": "Maze.Graphics/main.cpp",
+      "sha256": "86709c18eec908de3b37b04ea41274e4492075ae02634e1ccf28e8e954142c52"
+    },
+    {
+      "file": "Maze.Graphics/Maze.Graphics.vcxproj",
+      "sha256": "fab0cd1c374f9c4ccea4e396f7f622cf9061a920c638ab88c77a31e2b6f815f5"
+    },
+    {
+      "file": "Maze.Graphics/MazeApplication.cpp",
+      "sha256": "809dd1ded93856efc1ebbe4d3a93a02cd31cfef574cccf8b197d508997683900"
+    },
+    {
+      "file": "Maze.Graphics/MazeApplication.h",
+      "sha256": "31ffb18ce00977b89af165982129d0ca102717d9ea17229e847a24019220cefa"
+    },
+    {
+      "file": "Maze.Graphics/MazeViewport.h",
+      "sha256": "107bf5e606eafcf8fd8c752b2ac59871a98114e95dfa430fa7f9695d0e04616d"
+    },
+    {
+      "file": "Maze.Graphics/menu.cpp",
+      "sha256": "c60842be38accb3976739ab8fed2b9a15f7afc084c444b47e35d41447ed510f6"
+    },
+    {
+      "file": "Maze.Graphics/menu.h",
+      "sha256": "30bd3d17dc7c3497d9affb910257c53cffb8d3c87b53369b3463556e130801d2"
+    },
+    {
+      "file": "Maze.Graphics/SettingsPath.cpp",
+      "sha256": "58d85c22c81af6e437faccc23ce58c779acf46fadefc1d7670f49043413d670e"
+    },
+    {
+      "file": "Maze.Graphics/SettingsPath.h",
+      "sha256": "3a93c7b0da2d8c0df4cb9999ec9288d3c21a0465177fded7aa3b125cef19e7a4"
+    },
+    {
+      "file": "Maze.UnitTest/GameStateTests.cpp",
+      "sha256": "8baa3aed539a3e4fe13c4ff573faae47e77cd1e29ee86f515ef267cc8df4618f"
+    },
+    {
+      "file": "Maze.UnitTest/GameStatisticsTests.cpp",
+      "sha256": "09f24e349e6056deba3de5b79d5d5fedcb024bdd9ce8b6e56b99bae31d4ea0ae"
+    },
+    {
+      "file": "Maze.UnitTest/Maze.UnitTest.cpp",
+      "sha256": "7c829e5e1f0ad99c7c9146b7bd614f4df0ccc81628f88077bf3b06f77e4bb17e"
+    },
+    {
+      "file": "Maze.UnitTest/Maze.UnitTest.vcxproj",
+      "sha256": "6ddab0c6a9c2be8f6c444f2c00d5d63efe55396f15975c73f6ef93fdd15443cd"
+    },
+    {
+      "file": "Maze.UnitTest/MazeGenerationTests.cpp",
+      "sha256": "0ae39b3314ac0c635c462190fed8dd07f7e5012d6b2d60d871aab8d406b62e50"
+    },
+    {
+      "file": "Maze.UnitTest/MazeGridTests.cpp",
+      "sha256": "962b9c2767059c419232c8dddefbc41ae58d5cce802a8ea8de89929ee9cc73ad"
+    },
+    {
+      "file": "Maze.UnitTest/MazeMovementTests.cpp",
+      "sha256": "cd34cddf00c3e24dd4ce85a4782ac61e9b2615d65f108fff528cd3ac332461c7"
+    },
+    {
+      "file": "Maze.UnitTest/MazeSeedTests.cpp",
+      "sha256": "8bafcf7d55a728b6041c741934618205120c073a43c6ab6e5c1250fdb60cbf83"
+    },
+    {
+      "file": "Maze.UnitTest/MazeSessionTests.cpp",
+      "sha256": "15c1ec2b8e02d9042c3fc7d23c625ad85611627703bbac19aab91860421da988"
+    },
+    {
+      "file": "Maze.UnitTest/MazeSettingsTests.cpp",
+      "sha256": "f5a0016a1185c520a8c7349685b05edb55f04af4778abd26bb7ca330f608c2f6"
+    },
+    {
+      "file": "Maze.UnitTest/MazeViewportTests.cpp",
+      "sha256": "df105085b699c8c95d09ea6020f02f4a5bafd7a914a7a1dd42c3d7b37f200b6d"
+    },
+    {
+      "file": "Maze.UnitTest/pch.cpp",
+      "sha256": "b1dfc417ce748ffeec95311109dae13142c638e58cfa86eb6e5a0865082428aa"
+    },
+    {
+      "file": "Maze.UnitTest/pch.h",
+      "sha256": "7e9de1274d4f70a1d691a27a2b83c598aa48de9677bc8c9edff2e07675464bec"
+    }
+  ]
+}

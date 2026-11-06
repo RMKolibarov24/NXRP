@@ -3,14 +3,17 @@
 #include <SFML/Graphics.hpp>
 #include <array>
 #include <string>
+#include <optional>
 
 #include "MazeSize.h"
+#include "GameStatistics.h"
 
 enum class MenuAction
 {
     None,
     Continue,
     NewGame,
+    RestartMaze,
     HowToPlay,
     Settings,
     ApplySettings,
@@ -25,12 +28,15 @@ public:
 
     void resize(sf::Vector2u size);
     void setHasActiveGame(bool active);
+    void setCanRestart(bool available);
     void showMain();
     void showHowToPlay();
-    void showSettings(const MazeSize& selectedSize);
-    void showVictory(const MazeSize& completedSize);
+    void showSettings(const MazeSize& selectedSize, std::optional<std::uint32_t> seed = std::nullopt);
+    void showVictory(const MazeSize& completedSize, const GameStatistics& statistics,
+        std::optional<std::uint32_t> seed = std::nullopt);
     void showMessage(const std::string& message);
     MazeSize draftSize() const noexcept;
+    bool draftSeed(std::optional<std::uint32_t>& seed) const noexcept;
 
     MenuAction handleEvent(const sf::Event& event, const sf::RenderWindow& window);
     void update(sf::Vector2f mousePosition);
@@ -60,19 +66,27 @@ private:
     sf::Vector2u viewport_{ 900u, 600u };
     MazeSize draftSize_{ MIN_MAZE_SIZE, MIN_MAZE_SIZE };
     bool hasActiveGame_ = false;
+    bool canRestart_ = false;
     std::string notice_;
+    std::string draftSeedText_;
+    bool seedFocused_ = false;
 
     sf::Text title_;
     sf::Text subtitle_;
     sf::Text rules_;
     sf::Text message_;
     sf::Text victorySummary_;
+    sf::Text victoryStatistics_;
+    sf::Text victorySeed_;
     sf::Text rowName_;
     sf::Text colName_;
     sf::Text rowValue_;
     sf::Text colValue_;
     sf::Text sizeSummary_;
-    std::array<Button, 5> mainButtons_;
+    sf::Text seedLabel_;
+    sf::Text seedValue_;
+    sf::RectangleShape seedField_;
+    std::array<Button, 6> mainButtons_;
     std::array<Button, 4> sizeButtons_;
     Button backButton_;
     Button applyButton_;

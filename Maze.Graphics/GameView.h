@@ -4,6 +4,7 @@
 #include <string>
 
 #include "GameState.h"
+#include "MazeViewport.h"
 
 class GameView
 {
@@ -12,16 +13,21 @@ public:
 
     void resize(sf::Vector2u size);
     void reset();
+    void resetFeedback();
     void handleEvent(const sf::Event& event, GameState& game);
     void draw(sf::RenderTarget& target, const GameState& game);
 
 private:
     sf::Vector2u viewport_{ 900u, 600u };
+    MazeViewport camera_;
     std::string notice_;
     sf::Text title_;
+    sf::Text seed_;
+    sf::Text zoom_;
     sf::Text controls_;
     sf::Text legend_;
     sf::Text position_;
+    sf::Text statistics_;
     sf::Text message_;
     sf::Text cellLabel_;
     sf::VertexArray cells_{ sf::PrimitiveType::Triangles };

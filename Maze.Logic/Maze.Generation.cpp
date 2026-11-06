@@ -2,6 +2,7 @@
 #include "Maze.Validation.h"
 
 #include <random>
+#include <charconv>
 #include <stdexcept>
 #include <vector>
 
@@ -59,6 +60,27 @@ MazeGrid generateMaze(const MazeSize& size)
 {
     if (!isValidMazeSize(size))
         throw std::invalid_argument("Maze dimensions must each be between 10 and 50.");
+    return generateMaze(size, generateMazeSeed());
+}
+
+std::uint32_t generateMazeSeed()
+{
     std::random_device entropy;
-    return generateMaze(size, static_cast<std::uint32_t>(entropy()));
+    return static_cast<std::uint32_t>(entropy());
+}
+
+bool parseMazeSeed(std::string_view text, std::optional<std::uint32_t>& seed) noexcept
+{
+    if (text.empty())
+    {
+        seed.reset();
+        return true;
+    }
+    if (text.size() > 10) return false;
+
+    std::uint32_t value = 0;
+    const auto result = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (result.ec != std::errc{} || result.ptr != text.data() + text.size()) return false;
+    seed = value;
+    return true;
 }

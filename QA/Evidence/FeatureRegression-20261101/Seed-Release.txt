@@ -1,0 +1,2 @@
+PASS 10x10 at 900x600: recorded random seed; zero/maximum replay; invalid input; editing/focus; Cancel/Escape; paused/restart state; victory seed; random reset and compatible stored dimensions.
+PASS 50x50 at 640x560: recorded random seed; zero/maximum replay; invalid input; editing/focus; Cancel/Escape; paused/restart state; victory seed; random reset and compatible stored dimensions.

@@ -1,5 +1,6 @@
 #include "GameView.h"
 #include "Maze.Game.h"
+#include "GameStatisticsText.h"
 
 #include <algorithm>
 #include <cmath>
@@ -23,14 +24,17 @@ namespace
 }
 
 GameView::GameView(const sf::Font& font)
-    : title_(font, "MAZE", 30), controls_(font, "", 18),
-      legend_(font, "", 17), position_(font, "", 22), message_(font, "", 20),
+    : title_(font, "MAZE", 30), seed_(font, "", 20), zoom_(font, "", 18), controls_(font, "", 18),
+      legend_(font, "", 17), position_(font, "", 22), statistics_(font, "", 22), message_(font, "", 20),
       cellLabel_(font, "", 16)
 {
     title_.setFillColor(textColor);
+    seed_.setFillColor(mutedColor);
+    zoom_.setFillColor(mutedColor);
     controls_.setFillColor(mutedColor);
     legend_.setFillColor(textColor);
     position_.setFillColor(textColor);
+    statistics_.setFillColor(textColor);
     cellLabel_.setFillColor({ 18, 22, 31 });
     reset();
 }
@@ -42,17 +46,42 @@ void GameView::resize(sf::Vector2u size)
 
 void GameView::reset()
 {
+    camera_.fit();
+    resetFeedback();
+}
+
+void GameView::resetFeedback()
+{
     notice_ = "Find the green exit.";
 }
 
 void GameView::handleEvent(const sf::Event& event, GameState& game)
 {
+    if (game.phase != GamePhase::Playing || game.maze.empty()) return;
+    if (const auto* wheel = event.getIf<sf::Event::MouseWheelScrolled>())
+    {
+        const sf::FloatRect boardArea({ 24.f, 112.f }, {
+            std::max(0.f, static_cast<float>(viewport_.x) - 48.f),
+            std::max(0.f, static_cast<float>(viewport_.y) - 250.f) });
+        if (wheel->wheel != sf::Mouse::Wheel::Vertical || !std::isfinite(wheel->delta)
+            || !boardArea.contains({ static_cast<float>(wheel->position.x), static_cast<float>(wheel->position.y) })) return;
+        if (wheel->delta > 0.f) camera_.zoomIn();
+        else if (wheel->delta < 0.f) camera_.zoomOut();
+        return;
+    }
     const auto* key = event.getIf<sf::Event::KeyPressed>();
-    if (!key || game.phase != GamePhase::Playing) return;
+    if (!key) return;
 
     MoveDirection direction;
     switch (key->code)
     {
+    case sf::Keyboard::Key::Equal:
+    case sf::Keyboard::Key::Add: camera_.zoomIn(); return;
+    case sf::Keyboard::Key::Hyphen:
+    case sf::Keyboard::Key::Subtract: camera_.zoomOut(); return;
+    case sf::Keyboard::Key::Num0:
+    case sf::Keyboard::Key::Numpad0:
+    case sf::Keyboard::Key::Home: camera_.fit(); return;
     case sf::Keyboard::Key::Up:    direction = MoveDirection::Up; break;
     case sf::Keyboard::Key::Down:  direction = MoveDirection::Down; break;
     case sf::Keyboard::Key::Left:  direction = MoveDirection::Left; break;
@@ -74,9 +103,15 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     const float height = static_cast<float>(viewport_.y);
     title_.setPosition({ 24.f, 14.f });
     controls_.setString(std::to_string(game.maze.size().rows) + " x "
-        + std::to_string(game.maze.size().cols) + "  |  Arrow keys: move  |  Esc: menu");
+        + std::to_string(game.maze.size().cols) + "  |  Arrows: move  |  R: restart  |  Esc: menu  |  +/-: zoom  |  0: fit");
     controls_.setPosition({ 24.f, 56.f });
     target.draw(title_);
+    seed_.setString(game.mazeSeed ? "Seed " + std::to_string(*game.mazeSeed) : "Seed unavailable");
+    seed_.setPosition({ 140.f, 24.f });
+    target.draw(seed_);
+    zoom_.setString("Zoom " + std::to_string(camera_.zoomLevel() * 100) + "%");
+    zoom_.setPosition({ std::floor(width - 24.f - zoom_.getLocalBounds().size.x), 24.f });
+    target.draw(zoom_);
     target.draw(controls_);
 
     const sf::Color legendColors[] = { wallColor, passageColor, exitColor, playerColor };
@@ -95,8 +130,11 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
 
     position_.setString("Row " + std::to_string(game.player.row)
         + "  |  Column " + std::to_string(game.player.col));
-    position_.setPosition({ 24.f, height - 86.f });
+    position_.setPosition({ 24.f, height - 116.f });
     target.draw(position_);
+    statistics_.setString(gameStatisticsText(game.statistics));
+    statistics_.setPosition({ 24.f, height - 85.f });
+    target.draw(statistics_);
     const bool won = game.phase == GamePhase::Won;
     message_.setString(won ? "You reached the exit! Esc returns to the menu." : notice_);
     message_.setFillColor(won ? exitColor : mutedColor);
@@ -105,15 +143,17 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
 
     if (game.maze.empty()) return;
     const auto& size = game.maze.size();
-    const float rows = static_cast<float>(size.rows);
-    const float cols = static_cast<float>(size.cols);
-    const float availableHeight = std::max(0.f, height - 220.f);
-    const float cellSize = std::floor(std::min(std::max(0.f, width - 48.f) / cols,
-        availableHeight / rows));
+    const sf::Vector2f areaSize{ std::max(0.f, width - 48.f), std::max(0.f, height - 250.f) };
+    const auto layout = camera_.layout(size, game.player, areaSize.x, areaSize.y);
+    const float cellSize = layout.cellSize;
     if (cellSize < 2.f) return;
-    const sf::Vector2f boardSize{ cellSize * cols, cellSize * rows };
-    const sf::Vector2f origin{ std::floor((width - boardSize.x) / 2.f),
-        112.f + std::floor((availableHeight - boardSize.y) / 2.f) };
+    const sf::Vector2f boardSize{ cellSize * static_cast<float>(size.cols), cellSize * static_cast<float>(size.rows) };
+    const sf::Vector2f origin{ 0.f, 0.f };
+    const auto previousView = target.getView();
+    sf::View boardView(sf::FloatRect({ layout.left, layout.top }, areaSize));
+    boardView.setViewport(sf::FloatRect({ 24.f / width, 112.f / height }, { areaSize.x / width, areaSize.y / height }));
+    boardView.setScissor(boardView.getViewport());
+    target.setView(boardView);
     sf::RectangleShape border(boardSize);
     border.setPosition(origin);
     border.setFillColor({ 18, 22, 31 });
@@ -169,4 +209,5 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
                 + std::floor(cellSize / 2.f - radius) });
         target.draw(player);
     }
+    target.setView(previousView);
 }

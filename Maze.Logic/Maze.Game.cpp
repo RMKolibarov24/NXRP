@@ -1,6 +1,7 @@
 #include "Maze.Game.h"
 
 #include <stdexcept>
+#include <limits>
 #include <utility>
 
 namespace
@@ -60,21 +61,46 @@ MazeGrid createDemoMaze()
     return maze;
 }
 
-void startGame(GameState& game, MazeGrid&& preparedMaze)
+void startGame(GameState& game, MazeGrid&& preparedMaze, std::optional<std::uint32_t> seed)
 {
     validatePreparedMaze(preparedMaze);
     const MazeSize size = preparedMaze.size();
     game.maze = std::move(preparedMaze);
+    game.mazeSeed = seed;
     game.selectedSize = size;
     game.player = { 0, 0 };
     game.phase = GamePhase::Playing;
+    game.statistics = {};
+}
+
+bool restartGame(GameState& game) noexcept
+{
+    if (game.maze.empty() || (game.phase != GamePhase::Playing
+        && game.phase != GamePhase::Paused && game.phase != GamePhase::Won))
+        return false;
+
+    game.player = { 0, 0 };
+    game.phase = GamePhase::Playing;
+    game.statistics = {};
+    return true;
 }
 
 void endGame(GameState& game) noexcept
 {
     game.maze = MazeGrid();
+    game.mazeSeed.reset();
     game.player = { 0, 0 };
     game.phase = GamePhase::Menu;
+    game.statistics = {};
+}
+
+void advanceGameTime(GameState& game, std::chrono::steady_clock::duration elapsed) noexcept
+{
+    using Duration = std::chrono::steady_clock::duration;
+    if (game.phase != GamePhase::Playing || game.maze.empty() || elapsed <= Duration::zero()) return;
+
+    const auto remaining = Duration::max() - game.statistics.elapsed;
+    game.statistics.elapsed += elapsed < remaining ? elapsed : remaining;
 }
 
 bool hasWon(const GameState& game)
@@ -103,6 +129,8 @@ MoveResult tryMove(GameState& game, MoveDirection direction)
 
     if (!isWalkable(game.maze, next)) return MoveResult::Blocked;
     game.player = next;
+    if (game.statistics.successfulMoves < std::numeric_limits<std::uint64_t>::max())
+        ++game.statistics.successfulMoves;
     if (hasWon(game))
     {
         game.phase = GamePhase::Won;

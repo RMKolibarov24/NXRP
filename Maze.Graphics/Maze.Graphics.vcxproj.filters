@@ -18,10 +18,16 @@
     <ClCompile Include="GameView.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GameStatisticsText.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="MazeApplication.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ExecutablePath.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SettingsPath.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,10 +38,19 @@
     <ClInclude Include="GameView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MazeViewport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameStatisticsText.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="MazeApplication.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ExecutablePath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SettingsPath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
