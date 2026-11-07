@@ -288,5 +288,6 @@ int main()
     hv.elevation_ = refugeUpperFloor; hv.angle_ = 0.f; hv.pitch_ = -.12f;
     hv.draw(refugeTarget, host.game_); refugeTarget.display();
     assert(refugeTarget.getTexture().copyToImage().saveToFile("build/refuge-upper.png"));
+    std::cout << "Screen-space ray tracing active: " << hv.rayTracingActive() << "\n";
     std::cout << "Four-player joins, capacity, both puzzles, refuges, captures, shifting, reconnect, and victory passed.\n";
 }
