@@ -17,6 +17,13 @@ uniform float farPlane;
 uniform float tanHalfFov;
 uniform float aspect;
 uniform float seed;
+uniform sampler2D groundMaterial;
+uniform sampler2D groundNormal;
+uniform float groundMaps;
+uniform mat3 cameraToWorld;
+uniform mat3 worldToCamera;
+uniform vec3 eyeWorld;
+uniform vec2 refugeCenters[4];
 varying vec2 uv;
 
 float hash21(vec2 p)
@@ -80,9 +87,36 @@ float ambientOcclusion(vec2 texUv, vec3 point, vec3 normal, float distanceToEye)
     return clamp(visible, 0.38, 1.0);
 }
 
-vec3 tracedReflection(vec3 point, vec3 normal, float distanceToEye)
+float softContactShadow(vec3 point,vec3 normal)
 {
-    if (rayTrace < 0.5 || distanceToEye >= farPlane * 0.97) return vec3(0.0);
+    // Four nearby positions on an area moon produce a small soft penumbra.
+    // Occluders are restricted to geometry present in the depth buffer.
+    vec3 light=worldToCamera*normalize(vec3(-1.0,3.0,-1.0));
+    float visible=1.0;
+    for(int sampleIndex=0;sampleIndex<4;++sampleIndex)
+    {
+        float angle=float(sampleIndex)*2.39996323+seed*.017;
+        vec3 ray=normalize(light+vec3(cos(angle),sin(angle),0.0)*.11);
+        vec3 march=point+normal*.035;
+        float stride=.045;
+        for(int step=0;step<9;++step)
+        {
+            march+=ray*stride;stride*=1.48;
+            if(march.z>-.05)break;
+            vec2 at=projectView(march);
+            if(at.x<0.0 || at.y<0.0 || at.x>1.0 || at.y>1.0)break;
+            float sceneDepth=linearDepth(texture2D(depthTex,at).r);
+            float behind=-march.z-sceneDepth;
+            if(behind>.018 && behind<.10+stride*.2)
+            {visible-=.25;break;}
+        }
+    }
+    return visible;
+}
+
+vec3 tracedReflection(vec3 point, vec3 normal, float distanceToEye,float roughness,float water)
+{
+    if (rayTrace < 0.5 || water<.01 || distanceToEye >= farPlane * 0.97) return vec3(0.0);
     vec3 viewDirection = normalize(point);
     vec3 ray = reflect(viewDirection, normal);
     if (ray.z > -0.02) return vec3(0.0);
@@ -101,8 +135,13 @@ vec3 tracedReflection(vec3 point, vec3 normal, float distanceToEye)
         {
             float fresnel = pow(1.0 - max(dot(-viewDirection, normal), 0.0), 2.6);
             float fade = clamp(1.0 - length(march - point) / 7.0, 0.0, 1.0);
-            vec3 hitColor = texture2D(scene, screenUv).rgb;
-            return hitColor * fresnel * fade * (0.30 + 0.45 * max(normal.y, 0.0));
+            vec2 blur=vec2(1.0)/resolution*(1.0+roughness*roughness*8.0);
+            vec3 hitColor=(texture2D(scene,screenUv+vec2(blur.x,0.0)).rgb
+                +texture2D(scene,screenUv-vec2(blur.x,0.0)).rgb
+                +texture2D(scene,screenUv+vec2(0.0,blur.y)).rgb
+                +texture2D(scene,screenUv-vec2(0.0,blur.y)).rgb)*.25;
+            float edge=clamp(min(min(screenUv.x,screenUv.y),min(1.0-screenUv.x,1.0-screenUv.y))*12.0,0.0,1.0);
+            return hitColor*fresnel*fade*edge*water*(1.0-roughness*.65)*.8;
         }
     }
     return vec3(0.0);
@@ -135,6 +174,21 @@ void main()
     float distanceToEye = linearDepth(rawDepth);
     vec3 point = viewPoint(distorted, distanceToEye);
     vec3 normal = surfaceNormal(point);
+    vec3 world=eyeWorld+cameraToWorld*point;
+    vec3 worldNormal=cameraToWorld*normal;
+    float water=0.0,roughness=.9;
+    bool refugeFloor=false;
+    for(int house=0;house<4;++house)
+        if(abs(world.x-refugeCenters[house].x)<2.5 && abs(world.z-refugeCenters[house].y)<2.5)refugeFloor=true;
+    if(groundMaps>.5 && !refugeFloor && abs(world.y)<.045 && worldNormal.y>.85)
+    {
+        vec3 material=texture2D(groundMaterial,world.xz).rgb;
+        water=.65*smoothstep(.12,.42,1.0-material.r)*smoothstep(.60,.95,material.g);
+        roughness=clamp(mix(material.g,.14,water),.12,.98);
+        vec3 detail=texture2D(groundNormal,world.xz).xyz*2.0-1.0;
+        detail.xy*=.55;
+        normal=normalize(worldToCamera*normalize(vec3(detail.x,detail.z,detail.y)));
+    }
 
     // Chromatic separation near the edges: the fear response of an old lens.
     vec2 caDirection = normalize(centered + vec2(0.00001));
@@ -149,7 +203,8 @@ void main()
         if (rayTrace > 0.5)
         {
             color *= mix(1.0, ambientOcclusion(distorted, point, normal, distanceToEye), 0.55);
-            color += tracedReflection(point, normal, distanceToEye);
+            color*=mix(.76,1.0,softContactShadow(point,normal));
+            color += tracedReflection(point, normal, distanceToEye,roughness,water);
         }
         color += volumetric(point, distanceToEye);
     }

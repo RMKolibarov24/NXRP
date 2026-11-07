@@ -1600,7 +1600,7 @@ void GameView::prepareChunks(const GameState& game)
     const int cols = (size.cols + chunkSize - 1) / chunkSize;
     if (!clearChunks_ && rows == chunkRows_ && cols == chunkCols_) return;
     for (const auto list : hedgeChunks_) if (list) glDeleteLists(list, 1);
-    for (const auto list : groundChunks_) if (list) glDeleteLists(list, 1);
+    for (const auto list : groundChunks_) if (list) glDeleteLists(list, 2);
     for (const auto list : foliageChunks_) if (list) glDeleteLists(list, 1);
     chunkRows_ = rows; chunkCols_ = cols;
     hedgeChunks_.assign(static_cast<std::size_t>(rows * cols), 0);
@@ -1666,25 +1666,45 @@ void GameView::drawGroundChunks(const GameState& game, int r0, int r1, int c0, i
             if (!visibleChunks_[index]) continue;
             if (!groundChunks_[index])
             {
-                groundChunks_[index] = glGenLists(1);
+                groundChunks_[index] = glGenLists(2);
                 if (!groundChunks_[index]) continue;
-                glNewList(groundChunks_[index], GL_COMPILE);
-                glBegin(GL_QUADS);
-                const int lastRow = std::min(size.rows, (cr + 1) * chunkSize);
-                const int lastCol = std::min(size.cols, (cc + 1) * chunkSize);
-                for (int row = cr * chunkSize; row < lastRow; ++row)
-                    for (int col = cc * chunkSize; col < lastCol; ++col)
+                // Partition the existing ground quads by material; no new model.
+                for(int floorPass=0;floorPass<2;++floorPass)
+                {
+                    glNewList(groundChunks_[index]+floorPass,GL_COMPILE);glBegin(GL_QUADS);
+                    const int lastRow=std::min(size.rows,(cr+1)*chunkSize);
+                    const int lastCol=std::min(size.cols,(cc+1)*chunkSize);
+                    for(int row=cr*chunkSize;row<lastRow;++row)for(int col=cc*chunkSize;col<lastCol;++col)
                     {
-                        const unsigned grain = (static_cast<unsigned>(row) * 92821u ^ static_cast<unsigned>(col) * 68917u) % 15u;
-                        const float shade = grain / 255.f;
-                        if (groundTexture_) glColor3f(.85f + shade, .85f + shade, .82f + shade);
-                        else glColor3f(.19f + shade, .19f + shade, .14f + shade * .7f);
+                        const bool timber=safehouseAt({row,col},safehouses_)>=0;
+                        if(timber!=(floorPass==1))continue;
+                        const unsigned grain=(static_cast<unsigned>(row)*92821u^static_cast<unsigned>(col)*68917u)%15u;
+                        const float shade=grain/255.f;
+                        glColor3f(.85f+shade,.85f+shade,.82f+shade);
                         subdividedQuad(static_cast<float>(col),0,static_cast<float>(row),static_cast<float>(col+1),0,static_cast<float>(row),
                             static_cast<float>(col+1),0,static_cast<float>(row+1),static_cast<float>(col),0,static_cast<float>(row+1),0,1,0,2);
                     }
-                glEnd(); glEndList();
+                    glEnd();glEndList();
+                }
             }
             glCallList(groundChunks_[index]);
+            if(worldShader_)
+            {
+                worldShader_->setUniform("materialMaps",woodMapsReady_);worldShader_->setUniform("wetness",0.f);
+                worldShader_->setUniform("refugeLighting",safehouseAt(game.player,safehouses_)>=0?1.f:0.f);
+                if(woodMapsReady_){worldShader_->setUniform("normalMap",woodNormal_);worldShader_->setUniform("materialMap",woodMaterial_);}
+                sf::Shader::bind(worldShader_.get());
+            }
+            glBindTexture(GL_TEXTURE_2D,shelterTexture_?shelterTexture_:groundTexture_);
+            glCallList(groundChunks_[index]+1);
+            if(worldShader_)
+            {
+                worldShader_->setUniform("materialMaps",groundMapsReady_);worldShader_->setUniform("wetness",.65f);
+                worldShader_->setUniform("refugeLighting",0.f);
+                if(groundMapsReady_){worldShader_->setUniform("normalMap",groundNormal_);worldShader_->setUniform("materialMap",groundMaterial_);}
+                sf::Shader::bind(worldShader_.get());
+            }
+            glBindTexture(GL_TEXTURE_2D,groundTexture_);
         }
 }
 
@@ -2006,9 +2026,25 @@ void GameView::drawPostProcess(const GameState& game, float flash)
     postShader_->setUniform("rayTrace", rayTraceEnabled_ ? 1.f : 0.f);
     postShader_->setUniform("nearPlane", .05f);
     postShader_->setUniform("farPlane", 24.f);
-    postShader_->setUniform("tanHalfFov", .65f);
+    postShader_->setUniform("tanHalfFov", .65f*(1.f+.035f*sprintBlend_));
     postShader_->setUniform("aspect", height > 0 ? static_cast<float>(width) / height : 1.f);
     postShader_->setUniform("seed", static_cast<float>(game.mazeSeed.value_or(0) % 997u));
+    GLfloat view[16];glGetFloatv(GL_MODELVIEW_MATRIX,view);
+    const float toWorld[]={view[0],view[4],view[8],view[1],view[5],view[9],view[2],view[6],view[10]};
+    const float toCamera[]={view[0],view[1],view[2],view[4],view[5],view[6],view[8],view[9],view[10]};
+    postShader_->setUniform("cameraToWorld",sf::Glsl::Mat3(toWorld));
+    postShader_->setUniform("worldToCamera",sf::Glsl::Mat3(toCamera));
+    postShader_->setUniform("eyeWorld",sf::Glsl::Vec3(
+        -(view[0]*view[12]+view[1]*view[13]+view[2]*view[14]),
+        -(view[4]*view[12]+view[5]*view[13]+view[6]*view[14]),
+        -(view[8]*view[12]+view[9]*view[13]+view[10]*view[14])));
+    postShader_->setUniform("groundMaps",groundMapsReady_?1.f:0.f);
+    postShader_->setUniform("groundMaterial",2);
+    postShader_->setUniform("groundNormal",3);
+    sf::Glsl::Vec2 refugeCenters[4]={{-100.f,-100.f},{-100.f,-100.f},{-100.f,-100.f},{-100.f,-100.f}};
+    for(std::size_t i=0;i<std::min(safehouses_.size(),std::size_t{4});++i)
+        refugeCenters[i]={safehouses_[i].col+.5f,safehouses_[i].row+.5f};
+    postShader_->setUniformArray("refugeCenters",refugeCenters,4);
 
     glDisable(GL_DEPTH_TEST); glDisable(GL_LIGHTING); glDisable(GL_FOG);
     glDisable(GL_BLEND); glDisable(GL_ALPHA_TEST);
@@ -2022,6 +2058,8 @@ void GameView::drawPostProcess(const GameState& game, float flash)
     api.activeTexture(GL_TEXTURE1);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, sceneDepth_);
+    api.activeTexture(GL_TEXTURE0+2);glBindTexture(GL_TEXTURE_2D,groundMaterial_.getNativeHandle());
+    api.activeTexture(GL_TEXTURE0+3);glBindTexture(GL_TEXTURE_2D,groundNormal_.getNativeHandle());
     sf::Shader::bind(postShader_.get());
     glColor4f(1.f, 1.f, 1.f, 1.f);
     glBegin(GL_QUADS);
@@ -2031,6 +2069,9 @@ void GameView::drawPostProcess(const GameState& game, float flash)
     glTexCoord2f(0.f, 1.f); glVertex3f(0.f, 1.f, 0.f);
     glEnd();
     sf::Shader::bind(nullptr);
+    api.activeTexture(GL_TEXTURE0+3);glBindTexture(GL_TEXTURE_2D,0);
+    api.activeTexture(GL_TEXTURE0+2);glBindTexture(GL_TEXTURE_2D,0);
+    api.activeTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, 0);
     glDisable(GL_TEXTURE_2D);
     api.activeTexture(GL_TEXTURE0);
@@ -2118,7 +2159,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     glRotatef(180.f - angle_ * 180.f / pi, 0.f, 1.f, 0.f);
     glTranslatef(-x_, -eyeHeight, -z_);
     glEnable(GL_FOG); glFogi(GL_FOG_MODE, GL_EXP2);
-    glFogf(GL_FOG_DENSITY, .12f + .075f * darkness_ + .006f * std::sin(ambientTime_ * .17f));
+    glFogf(GL_FOG_DENSITY, .048f + .025f * darkness_ + .003f * std::sin(ambientTime_ * .17f));
     glEnable(GL_LIGHTING); glEnable(GL_LIGHT0); glEnable(GL_LIGHT1); glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
     const auto storm = sampleStorm(ambientTime_, game.mazeSeed.value_or(0));
@@ -2165,8 +2206,25 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     // Subdivide the ground so the moving flashlight is evaluated throughout the path.
     if (!groundTextureAttempted_)
     {
-        groundTexture_ = loadSurfaceTexture(executableDirectory() / "assets" / "textures" / "ground.png");
+        const auto textures=executableDirectory()/"assets"/"textures";
+        if(groundAlbedo_.loadFromFile(textures/"pbr"/"ground-diffuse.png"))groundTexture_=groundAlbedo_.getNativeHandle();
+        if(!groundTexture_)groundTexture_=loadSurfaceTexture(textures/"ground.png");
+        groundMapsReady_=groundAlbedo_.getSize().x>0 && groundNormal_.loadFromFile(textures/"pbr"/"ground-nor_gl.png")
+            && groundMaterial_.loadFromFile(textures/"pbr"/"ground-arm.png");
+        for(auto* map:{&groundAlbedo_,&groundNormal_,&groundMaterial_})
+        {if(map->getSize().x){map->setSmooth(true);map->setRepeated(true);(void)map->generateMipmap();}}
         groundTextureAttempted_ = true;
+    }
+    if (!shelterTextureAttempted_)
+    {
+        const auto textures=executableDirectory()/"assets"/"textures";
+        if(woodAlbedo_.loadFromFile(textures/"pbr"/"wood-diffuse.png"))shelterTexture_=woodAlbedo_.getNativeHandle();
+        if(!shelterTexture_)shelterTexture_=loadSurfaceTexture(textures/"shelter-wood.png");
+        woodMapsReady_=woodAlbedo_.getSize().x>0 && woodNormal_.loadFromFile(textures/"pbr"/"wood-nor_gl.png")
+            && woodMaterial_.loadFromFile(textures/"pbr"/"wood-arm.png");
+        for(auto* map:{&woodAlbedo_,&woodNormal_,&woodMaterial_})
+        {if(map->getSize().x){map->setSmooth(true);map->setRepeated(true);(void)map->generateMipmap();}}
+        shelterTextureAttempted_ = true;
     }
     if (worldShader_)
     {
@@ -2174,7 +2232,12 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         worldShader_->setUniform("flicker", flicker);
         worldShader_->setUniform("flash", flash);
         worldShader_->setUniform("textured", groundTexture_ != 0);
-        worldShader_->setUniform("wetness", .20f);
+        worldShader_->setUniform("wetness", .65f);
+        worldShader_->setUniform("materialMaps",groundMapsReady_);
+        worldShader_->setUniform("normalStrength",.55f);
+        worldShader_->setUniform("refugeLighting",0.f);
+        if(groundMapsReady_)
+        {worldShader_->setUniform("normalMap",groundNormal_);worldShader_->setUniform("materialMap",groundMaterial_);}
         sf::Shader::bind(worldShader_.get());
     }
     if (groundTexture_) { glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, groundTexture_); }
@@ -2184,6 +2247,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     {
         worldShader_->setUniform("textured", true);
         worldShader_->setUniform("wetness", .06f);
+        worldShader_->setUniform("materialMaps",false);
     }
     drawHedgeChunks(game, r0, r1, c0, c1);
     if (foliageShader_)
@@ -2217,10 +2281,14 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         const float hx = house.col + .5f, hz = house.row + .5f;
         if ((hx-x_)*(hx-x_) + (hz-z_)*(hz-z_) > 144.f) continue;
         glPushMatrix(); glTranslatef(hx, 0.f, hz); glScalef(refugeScale, 1.f, refugeScale); glTranslatef(-hx, 0.f, -hz);
-        if (!shelterTextureAttempted_)
+        if(worldShader_)
         {
-            shelterTexture_ = loadSurfaceTexture(executableDirectory() / "assets" / "textures" / "shelter-wood.png");
-            shelterTextureAttempted_ = true;
+            worldShader_->setUniform("materialMaps",woodMapsReady_);
+            worldShader_->setUniform("wetness",0.f);
+            worldShader_->setUniform("normalStrength",.75f);
+            worldShader_->setUniform("refugeLighting",inRefuge?1.f:0.f);
+            if(woodMapsReady_){worldShader_->setUniform("normalMap",woodNormal_);worldShader_->setUniform("materialMap",woodMaterial_);}
+            sf::Shader::bind(worldShader_.get());
         }
         if (shelterTexture_) { glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, shelterTexture_); }
         if (shelterTexture_) glColor3f(.8f, .78f, .72f); else glColor3f(.21f, .19f, .15f);
@@ -2251,6 +2319,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         for (int post = 0; post < 6; ++post)
             part(hx + .63f, refugeUpperFloor, hz - 1.1f + post * .38f, .045f, .5f, .045f);
         part(hx, 3.65f, hz, 2.80f, .12f, 2.80f);
+        sf::Shader::bind(nullptr);
         glDisable(GL_TEXTURE_2D);
         // Painted teal and coral trim and festoon bulbs on both floors.
         for (int floor = 0; floor < 2; ++floor)

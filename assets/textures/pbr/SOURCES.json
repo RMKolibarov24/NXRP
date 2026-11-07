@@ -1,0 +1,55 @@
+{
+  "license": "CC0-1.0",
+  "license_url": "https://polyhaven.com/license",
+  "credit": "Powered by Poly Haven",
+  "assets": [
+    {
+      "asset": "brown_mud_leaves_01",
+      "source": "https://polyhaven.com/a/brown_mud_leaves_01",
+      "files": [
+        {
+          "map": "diffuse",
+          "size": 1206953,
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_leaves_01/brown_mud_leaves_01_diff_1k.jpg",
+          "md5": "5340848384f9bb19bfa6e7ac459683d7"
+        },
+        {
+          "map": "nor_gl",
+          "size": 6109028,
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brown_mud_leaves_01/brown_mud_leaves_01_nor_gl_1k.png",
+          "md5": "bfa4b76dc2218b8b953d3eb2055fafad"
+        },
+        {
+          "map": "arm",
+          "size": 953367,
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_leaves_01/brown_mud_leaves_01_arm_1k.jpg",
+          "md5": "9d2a6f3c244c177503c5e441fad91a6e"
+        }
+      ]
+    },
+    {
+      "asset": "weathered_brown_planks",
+      "source": "https://polyhaven.com/a/weathered_brown_planks",
+      "files": [
+        {
+          "map": "diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/weathered_brown_planks/weathered_brown_planks_diff_1k.jpg",
+          "size": 226049,
+          "md5": "e2fbdf7ed402e272e33e3f7ba707cf69"
+        },
+        {
+          "map": "nor_gl",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/weathered_brown_planks/weathered_brown_planks_nor_gl_1k.png",
+          "size": 6305092,
+          "md5": "1224e8e9f59141c9d59cea836e52e7a2"
+        },
+        {
+          "map": "arm",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/weathered_brown_planks/weathered_brown_planks_arm_1k.jpg",
+          "size": 204214,
+          "md5": "be352d1156f18f438a44b290b494192e"
+        }
+      ]
+    }
+  ]
+}

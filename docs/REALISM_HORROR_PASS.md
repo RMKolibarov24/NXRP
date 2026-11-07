@@ -14,8 +14,11 @@ package, fork PR #6 updates and visible launch. Never author new model geometry.
    prepare_hand_rigs.py and INTERACTION_ANIMATIONS.md. Final play/pose review
    remains required. Legacy morph hands are retained only as fallback.
 2. Roughness/normal maps, softer shadows, wet reflections and readable fog:
-   **unfinished**. Existing screen-space reflection/contact shading is not proof
-   of material maps or soft shadows. Source suitable maps and render-verify.
+   implemented matching sourced Poly Haven diffuse/normal/ARM maps for mud and
+   timber; mipmapped filtering, derivative tangent frames, roughness-driven
+   highlights and wet-only rough reflections. Four area-light depth rays soften
+   contact shadows. Refuge ground quads use dry timber; fog density is reduced
+   so distant silhouettes remain readable. Final screenshot/play review pending.
 3. Layered breathing, uneven steps, distant knocks and positional growls, with
    wall/door muffling and silence: implemented acoustic transmission/filtering,
    uneven footfall timing, paired knocks and ambient hush. Quantitative unit
@@ -80,8 +83,8 @@ Graphics build copies assets; CoopSmoke does not. Unit runner is VS vstest.conso
 1. Acoustic, fair-AI and voice checkpoint f81eb21 is pushed to PR #6.
 2. Verify and checkpoint the new source rigs and weighted throw pipeline; review
    object contact and third-party licensing attribution before final delivery.
-3. Download/attribute material maps; implement normal/roughness-driven lighting,
-   softer shadows and restrained wet reflections, then inspect renders.
+3. Verify/checkpoint sourced PBR materials, softer contact shadows and readable
+   fog; source/license credits and GPU map-on/off checks have been added.
 4. Download licensed story props and build connected notes/distinct maze sections.
 5. Implement proper playable co-op poker with host-authoritative actions and
    private hole cards; ship source licenses/credits for imported props/cards.
@@ -105,3 +108,26 @@ were inspected. The drinking wrist frame now follows the vessel orientation;
 source meshes are never replaced with authored geometry. Protocol is now 12.
 Final broad pass packaging, listening, play balance and voice hardware checks
 remain outstanding; do not mark the six-part goal complete at this checkpoint.
+
+## Materials/lighting checkpoint
+
+Downloaded Poly Haven Brown Mud Leaves 01 and Weathered Brown Planks diffuse,
+OpenGL normal and ARM maps at 1K. Original checksums/sizes were verified; source
+URLs and checksums ship in assets/textures/pbr/SOURCES.json. Source authors,
+CC0 and API credit are recorded in texture credits/README. The optional import
+tool reproduces the converted PNG maps; there are no runtime network requests.
+
+Primary ground and timber use matched maps with mipmapping, derivative tangent
+frames, source occlusion and roughness-dependent highlights. Wet mud recesses
+receive a darker water film and roughness-dependent screen-space reflection
+strength/blur. Dry refuge ground uses the timber material on the existing quads.
+Four nearby moon rays provide softer screen-space contact shadows. Fog now keeps
+passage silhouettes readable. Reflection and shadow limits remain screen-space;
+offscreen geometry is not represented and the T toggle retains a cheaper path.
+
+Release builds and expanded real TCP/GPU smoke pass. The GPU test compares a
+frozen render with maps enabled/disabled and verifies substantial pixel changes;
+shader compile and source-map load are required. Interior, exterior and an actual
+maze passage with the hunter at its far end were rendered and inspected. The
+hunter remains recognizable; warm/colourful interior contrast is retained.
+Final full-goal play/audio/voice-device review and packaging remain outstanding.

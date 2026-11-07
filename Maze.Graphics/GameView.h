@@ -148,6 +148,8 @@ private:
     sf::Vector2u postSize_{};
     unsigned int hedgeTexture_ = 0, groundTexture_ = 0, monsterTexture_ = 0, foliageTexture_ = 0;
     unsigned int shelterTexture_ = 0;
+    sf::Texture groundAlbedo_,groundNormal_,groundMaterial_,woodAlbedo_,woodNormal_,woodMaterial_;
+    bool groundMapsReady_=false,woodMapsReady_=false;
     std::array<unsigned int, 4> refugePropMeshes_{};
     std::array<std::array<unsigned int,4>,3> reelMeshes_{};
     unsigned int slotsTexture_ = 0, barTexture_ = 0;

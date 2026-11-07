@@ -60,6 +60,9 @@ Settings persist the maze dimensions under `%LOCALAPPDATA%\NXRP\settings.txt`; s
 
 ## Project structure
 
+Ground and timber PBR materials: [Powered by Poly Haven](https://polyhaven.com/),
+CC0; authors and source links are in [the texture credits](assets/textures/README.md).
+
 `Maze.Data` owns the grid and session state, `Maze.Logic` generates seeded mazes and maintains session rules, and `Maze.Graphics` contains the SFML application and first-person OpenGL view. `Maze.UnitTest` covers grid and session rules and seeded puzzle placement. The archived QA evidence predates the first-person systems.
 
 The bar has a specific **E sit and drink** prompt; **Q** or **Space** stands up.

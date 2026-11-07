@@ -23,6 +23,10 @@ T toggles screen-space ray-traced lighting, B toggles camera motion, M mutes.
 Lighting traces the visible depth buffer for reflections and contact shading;
 offscreen geometry cannot contribute to those reflections. A compatible driver
 is needed, with an automatic fallback if framebuffer support is unavailable.
+Ground and timber use sourced normal and roughness maps. Wet mud catches light
+and screen-space reflections; refuge timber stays dry. Contact shadows use
+several nearby light samples for softer edges. T controls these screen-space
+effects; material detail remains active when they are off.
 
 For co-op, all players need this same build. Multiplayer > Host listens on TCP
 24816. Guests join the host address. On one computer use 127.0.0.1:24816; across

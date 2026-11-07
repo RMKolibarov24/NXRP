@@ -537,6 +537,44 @@ int main()
     hv.refugeSlots_[0].actor=0;hv.refugeSlots_[0].stopTime=hv.elapsed_+1.35f;
     hv.draw(refugeTarget,host.game_);refugeTarget.display();
     assert(refugeTarget.getTexture().copyToImage().saveToFile("build/slot-hand-contact.png"));
+    hv.x_=.5f;hv.z_=.5f;hv.elevation_=0.f;hv.pitch_=-.20f;hv.angle_=0.f;
+    hv.drinkClock_=0.f;hv.seatedHouse_=-1;hv.seatedBlend_=0.f;hv.throwClock_=0.f;
+    host.game_.player={0,0};
+    hv.draw(refugeTarget,host.game_);refugeTarget.display();
+    assert(hv.worldShader_ && hv.postShader_ && hv.groundMapsReady_ && hv.woodMapsReady_);
+    const auto mapped=refugeTarget.getTexture().copyToImage();
+    assert(mapped.saveToFile("build/exterior-materials.png"));
+    hv.groundMapsReady_=false;
+    hv.draw(refugeTarget,host.game_);refugeTarget.display();
+    const auto unmapped=refugeTarget.getTexture().copyToImage();
+    std::size_t materialPixels=0;
+    for(unsigned y=350;y<500;++y)for(unsigned x=40;x<600;++x)
+        materialPixels+=mapped.getPixel({x,y})!=unmapped.getPixel({x,y});
+    assert(materialPixels>500); // Normal/roughness maps affect the actual GPU render.
+    hv.groundMapsReady_=true;
+    int longest=0;MazePosition sightStart{},sightEnd{};float sightAngle=0.f;
+    const auto mazeSize=host.game_.maze.size();
+    for(int row=0;row<mazeSize.rows;++row)for(int col=0;col<mazeSize.cols;++col)
+    for(int direction=0;direction<2;++direction)
+    {
+        int run=0;
+        while(run<8)
+        {
+            const MazePosition at{row+(direction==0?run:0),col+(direction==1?run:0)};
+            if(!host.game_.maze.contains(at) || host.game_.maze.at(at.row,at.col)==MazeCell::Wall || safehouseAt(at,hv.safehouses_)>=0)break;
+            ++run;
+        }
+        if(run>longest)
+        {longest=run;sightStart={row,col};sightEnd={row+(direction==0?run-1:0),col+(direction==1?run-1:0)};sightAngle=direction==0?0.f:1.57079633f;}
+    }
+    if(longest>=4)
+    {
+        hv.x_=sightStart.col+.5f;hv.z_=sightStart.row+.5f;hv.angle_=sightAngle;hv.pitch_=0.f;
+        host.game_.player=sightStart;hv.elapsed_=13.f;hv.interiorHunter_=false;
+        hv.monster_=hv.monsterFrom_=hv.hunter_.cell=sightEnd;hv.hunter_.mode=HunterMode::Search;
+        hv.draw(refugeTarget,host.game_);refugeTarget.display();
+        assert(refugeTarget.getTexture().copyToImage().saveToFile("build/exterior-hunter-sightline.png"));
+    }
     std::cout << "Screen-space ray tracing active: " << hv.rayTracingActive() << "\n";
     std::cout << "Four-player joins, capacity, both puzzles, refuges, captures, shifting, reconnect, and victory passed.\n";
 }

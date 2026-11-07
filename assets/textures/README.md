@@ -1,6 +1,30 @@
 ﻿# Game textures
 
-These assets were generated with the built-in image generation tool for this game.
+## Sourced PBR materials
+
+`pbr/ground-*.png` use [Brown Mud Leaves 01 by Rob Tuytel](https://polyhaven.com/a/brown_mud_leaves_01).
+`pbr/wood-*.png` use [Weathered Brown Planks by Dimitrios Savva and Rico Cilliers](https://polyhaven.com/a/weathered_brown_planks).
+Both sets are [CC0](https://polyhaven.com/license). Powered by Poly Haven:
+https://polyhaven.com/. The public API is used only by the optional import tool;
+the game has no dependency on their service.
+
+The diffuse, OpenGL tangent-space normal and AO/roughness/metal maps were
+downloaded at 1K, verified against the API MD5 and size, and converted to RGB PNG.
+ARM channels remain R=occlusion, G=roughness, B=metalness (these are dielectrics).
+Normal and material values are sampled as data, without a colour gamma transform.
+The renderer uses mipmapped filtering. Water collects in source occlusion/roughness
+recesses, darkens the mud and reduces its roughness. Timber floors remain dry.
+Normals are transformed through the UV derivative frame; roughness controls
+highlight width and the strength/blur of wet ground reflections.
+
+Reproduce with `python tools/prepare_pbr_materials.py --download` (requires Pillow).
+Converted source maps ship with the game; Python is not required to play.
+
+## Earlier generated assets
+
+The earlier assets below were generated with the built-in image generation tool.
+The sourced PBR maps now replace the primary ground and shelter-wood textures;
+the earlier albedo images remain fallback assets.
 
 ## shelter-wood.png
 
