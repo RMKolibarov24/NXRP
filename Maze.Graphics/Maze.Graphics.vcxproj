@@ -80,6 +80,7 @@
     <ClInclude Include="MazeViewport.h" />
     <ClInclude Include="GameStatisticsText.h" />
     <ClInclude Include="MazeApplication.h" />
+    <ClInclude Include="HandRig.h" />
     <ClInclude Include="ExecutablePath.h" />
     <ClInclude Include="SettingsPath.h" />
   </ItemGroup>

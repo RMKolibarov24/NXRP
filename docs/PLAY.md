@@ -11,6 +11,7 @@ Houses have colourful two-floor interiors and act as checkpoints. They do not
 protect you from the hunter: it can force doors and climb the stairs. Walk up
 the east-side stairs to the games court. G picks up or throws a nearby basketball;
 face the hoop before throwing. K kicks the football in the direction you face.
+Throwing includes a short wind-up before release; keep facing your target.
 Goals and baskets reset the ball and update shared scores. Balls stay upstairs.
 
 Downstairs, face the slot-cabinet handle at close range and press E to pull. The monster can hear the reels.
@@ -49,4 +50,4 @@ assets/textures/README.md and assets/fonts/README.md.
 The hands close around carried basketballs, open with throw follow-through, and
 reach to the model's actual lever knob during its pull. Hold interactions briefly
 lock walking; the bar has a visible stool and a specific sit/drink prompt.
-All co-op players need this protocol-11 build for matching world and voice messages.
+All co-op players need this protocol-12 build for matching world and voice messages.

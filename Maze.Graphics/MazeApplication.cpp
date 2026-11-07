@@ -308,7 +308,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             unsigned version, generation, seed, phase; int rows, cols, selfSlot;
             if (!(in >> version)) continue;
-            if (version != 11)
+            if (version != 12)
             {
                 endNetwork(); menu_.showMultiplayer(); menu_.showMessage("Different game version. Everyone needs the same build.");
                 return;
@@ -384,7 +384,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             if (!(network_.connectedMask() & (1u << slot))) continue;
             std::ostringstream out;
-            out << "W 11 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
+            out << "W 12 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
                 << ' ' << *game_.mazeSeed << ' ' << phase << ' ' << slot << ' ' << world;
             network_.send(out.str(), slot);
         }

@@ -28,6 +28,16 @@
 
 int main()
 {
+    std::istringstream truncatedRig("NXR1");assert(!HandMotion::readRig(truncatedRig));
+    std::istringstream oversizedRig(std::string("NXR1")+std::string(12,static_cast<char>(255)));
+    assert(!HandMotion::readRig(oversizedRig));
+    for(const HandMotion::V target: {HandMotion::V{0,0,0},HandMotion::V{0,0,-10},HandMotion::V{0,.2f,0}})
+    {
+        const auto solved=HandMotion::solveArm({},target,{0,-1,0},.25f,.22f);
+        assert(std::isfinite(solved.elbow.x) && std::isfinite(solved.elbow.y) && std::isfinite(solved.elbow.z));
+        assert(std::abs(HandMotion::length(solved.elbow)-.25f)<.0001f);
+        assert(std::abs(HandMotion::length(solved.wrist-solved.elbow)-.22f)<.0001f);
+    }
     // The hand must grip before the lever moves, follow its complete return,
     // then open before withdrawing. Check motion across all phase boundaries.
     assert(slotLeverDegrees(.29f,2.f)==0.f);
@@ -289,6 +299,11 @@ int main()
     assert(hv.refugeBalls_[0][1].carrier == first.networkSlot_);
     for (int i=0; i<3; ++i) assert(guests[i]->gameView_.refugeBalls_[0][1].carrier == first.networkSlot_);
     sendKey(first, 'G');
+    assert(hv.refugeBalls_[0][1].carrier==first.networkSlot_ && hv.refugeBalls_[0][1].throwWindup>.27f);
+    for(int i=0;i<3;++i)assert(guests[i]->gameView_.refugeBalls_[0][1].throwWindup>.27f);
+    hv.updateRefugeGames(.14f);
+    assert(hv.refugeBalls_[0][1].carrier==first.networkSlot_);
+    hv.updateRefugeGames(.14f);
     assert(hv.refugeBalls_[0][1].carrier == -1 && hv.refugeBalls_[0][1].vy > 0.f);
     auto& basket = hv.refugeBalls_[0][1];
     basket.x = -.55f; basket.z = 1.53f; basket.y = 1.13f;
@@ -362,7 +377,7 @@ int main()
     hv.playRefugeBall(true, 0); assert(basket.carrier == 0);
     hv.updateRefugeGames(.01f); hv.playRefugeBall(true, 0);
     const unsigned beforeArc = basket.scoreA;
-    hv.updateRefugeGames(1.2f); assert(basket.scoreA == beforeArc + 1);
+    hv.updateRefugeGames(1.5f); assert(basket.scoreA == beforeArc + 1);
     basket.carrier = first.networkSlot_; hv.remote_[first.networkSlot_].present = false;
     hv.updateRefugeGames(.01f); assert(basket.carrier == -1);
     // Jump rises and lands; holding crouch prevents jumping and slows movement.
@@ -479,11 +494,34 @@ int main()
     assert(refugeTarget.getTexture().copyToImage().saveToFile("build/basketball-hands.png"));
     hv.heldBallLast_=true;hv.playRefugeBall(true,0);
     hv.update(host.game_,.05f,GameInput{});
+    assert(hv.refugeBalls_[0][1].carrier==0 && hv.refugeBalls_[0][1].throwWindup>0.f);
+    hv.draw(refugeTarget,host.game_);refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/basketball-windup.png"));
+    for(int frame=0;frame<6;++frame)hv.update(host.game_,.05f,GameInput{});
     assert(hv.throwClock_>0.f && hv.refugeBalls_[0][1].carrier==-1);
     hv.draw(refugeTarget,host.game_);refugeTarget.display();
     assert(refugeTarget.getTexture().copyToImage().saveToFile("build/basketball-release.png"));
     for(int side=0;side<2;++side)
     {
+        assert(hv.handRigs_[side] && hv.handSkinTexture_);
+        const auto& rig=*hv.handRigs_[side];
+        assert(rig.vertices.size()>10000 && rig.bones.size()>=19);
+        HandMotion::Pose openRig,closedRig;
+        const HandMotion::V shoulder{side==0?-.22f:.22f,-.27f,.015f},palm{side==0?-.15f:.15f,-.12f,-.31f};
+        HandMotion::skin(rig,openRig,shoulder,palm,{0,.25f,-1},{side==0?1.f:-1.f,0,0},0.f);
+        HandMotion::skin(rig,closedRig,shoulder,palm,{0,.25f,-1},{side==0?1.f:-1.f,0,0},1.f);
+        const auto& joints=closedRig.joints;
+        assert(std::abs(HandMotion::length(joints[rig.lower]-shoulder)-HandMotion::length(rig.bones[rig.lower].at-rig.bones[rig.upper].at))<.00001f);
+        assert(std::abs(HandMotion::length(joints[rig.hand]-joints[rig.lower])-HandMotion::length(rig.bones[rig.hand].at-rig.bones[rig.lower].at))<.00001f);
+        assert(HandMotion::length(joints[rig.hand]-(palm-HandMotion::unit({0,.25f,-1})*rig.palmLength))<.00001f);
+        std::size_t deformed=0;
+        for(std::size_t v=0;v<rig.vertices.size();++v)
+        {
+            const auto& a=openRig.vertices[v];const auto& b=closedRig.vertices[v];
+            for(float n:b.position)assert(std::isfinite(n));
+            deformed+=std::abs(a.position[0]-b.position[0])+std::abs(a.position[1]-b.position[1])+std::abs(a.position[2]-b.position[2])>.0001f;
+        }
+        assert(deformed>500);
         assert(hv.handOpen_[side] && hv.handGrip_[side]);
         const auto& open=*hv.handOpen_[side];const auto& grip=*hv.handGrip_[side];
         std::size_t changed=0;

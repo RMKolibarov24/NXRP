@@ -409,7 +409,7 @@ void GameView::resetFeedback() { }
 
 void GameView::initialize(GameState& game)
 {
-    seatedHouse_=-1; seatedBlend_=ballHoldBlend_=throwClock_=0.f; heldBallLast_=false;
+    seatedHouse_=-1; seatedBlend_=ballHoldBlend_=throwClock_=0.f; heldBallLast_=false;handInertia_={};lastHeldBall_={};
     interiorHunter_=false; interiorHouse_=-1; hunterY_=0.f;
     x_ = z_ = .5f; elevation_ = 0.f; jumpHeight_ = jumpVelocity_ = crouchBlend_ = 0.f; crouched_ = jumpHeld_ = false;
     const bool south = open(game.maze, 1, 0);
@@ -856,7 +856,7 @@ std::string GameView::worldSnapshot() const
     for (int slot = 0; slot < maxCoopPlayers; ++slot) out << ' ' << checkpoints_[slot];
     out << ' ' << doorMask();
     for (const auto& balls : refugeBalls_) for (const auto& b : balls)
-        out << ' ' << b.x << ' ' << b.y << ' ' << b.z << ' ' << b.vx << ' ' << b.vy << ' ' << b.vz << ' ' << b.carrier << ' ' << b.scoreA << ' ' << b.scoreB;
+        out << ' ' << b.x << ' ' << b.y << ' ' << b.z << ' ' << b.vx << ' ' << b.vy << ' ' << b.vz << ' ' << b.carrier << ' ' << b.scoreA << ' ' << b.scoreB << ' ' << b.throwWindup;
     for (const auto& machine : refugeSlots_)
         out << ' ' << machine.spins << ' ' << machine.stopTime << ' ' << machine.symbols[0] << ' ' << machine.symbols[1] << ' ' << machine.symbols[2] << ' ' << machine.actor;
     for (const auto count : drinks_) out << ' ' << count;
@@ -890,7 +890,8 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     auto balls = refugeBalls_;
     for (auto& houseBalls : balls) for (auto& b : houseBalls)
     {
-        if (!(in >> b.x >> b.y >> b.z >> b.vx >> b.vy >> b.vz >> b.carrier >> b.scoreA >> b.scoreB)) return false;
+        if (!(in >> b.x >> b.y >> b.z >> b.vx >> b.vy >> b.vz >> b.carrier >> b.scoreA >> b.scoreB >> b.throwWindup)) return false;
+        if(!std::isfinite(b.throwWindup) || b.throwWindup<0.f || b.throwWindup>.281f || (b.throwWindup>0.f && b.carrier<0))return false;
         if (!std::isfinite(b.x) || !std::isfinite(b.y) || !std::isfinite(b.z) || !std::isfinite(b.vx) ||
             !std::isfinite(b.vy) || !std::isfinite(b.vz) || std::abs(b.x) > 3.f || std::abs(b.z) > 3.f ||
             b.y < 0.f || b.y > 3.f || b.carrier < -1 || b.carrier >= maxCoopPlayers ||
@@ -1245,6 +1246,8 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
 void GameView::look(float horizontalPixels, float verticalPixels)
 {
     if (!initialized_) return;
+    handInertia_.x=std::clamp(handInertia_.x-horizontalPixels*.00015f,-.022f,.022f);
+    handInertia_.y=std::clamp(handInertia_.y+verticalPixels*.00012f,-.018f,.018f);
     angle_ -= std::clamp(horizontalPixels, -120.f, 120.f) * .0025f;
     pitch_ = std::clamp(pitch_ - std::clamp(verticalPixels, -120.f, 120.f) * .0025f, -1.f, 1.f);
 }
@@ -1280,7 +1283,13 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
         visual.angle += std::remainder(player.angle - visual.angle, 2.f * pi) * blend;
         visual.moving = player.moving; visual.running = player.running;
     }
-    bool held=false; for(const auto& balls:refugeBalls_) held=held || balls[1].carrier==networkSelfSlot_;
+    bool held=false;
+    for(std::size_t house=0;house<refugeBalls_.size();++house)if(refugeBalls_[house][1].carrier==networkSelfSlot_)
+    {
+        held=true;const auto& ball=refugeBalls_[house][1];
+        lastHeldBall_={safehouses_[house].col+.5f+ball.x,refugeUpperFloor+ball.y,safehouses_[house].row+.5f+ball.z};
+    }
+    handInertia_=handInertia_*std::exp(-seconds*9.f);
     if(heldBallLast_ && !held) throwClock_=.4f;
     ballHoldBlend_+=((held?1.f:0.f)-ballHoldBlend_)*std::min(1.f,seconds*10.f);
     heldBallLast_=held; throwClock_=std::max(0.f,throwClock_-seconds);
@@ -1395,13 +1404,13 @@ void GameView::playRefugeBall(bool basketball, int slot)
     const float pz = player.z - (safehouses_[house].row + .5f);
     if (b.carrier == slot)
     {
-        b.carrier = -1;
-        b.vx = std::sin(player.angle) * 2.4f; b.vz = std::cos(player.angle) * 2.4f; b.vy = 3.f;
+        // Keep possession through anticipation; the host releases at the end.
+        if(b.throwWindup==0.f)b.throwWindup=.28f;
         return;
     }
     const float dx = b.x - px, dz = b.z - pz;
     if (b.carrier >= 0 || dx * dx + dz * dz > .85f * .85f || b.y > .95f) return;
-    if (basketball) b.carrier = slot;
+    if (basketball) {b.carrier = slot;b.throwWindup=0.f;}
     else { b.vx = std::sin(player.angle) * 3.6f; b.vz = std::cos(player.angle) * 3.6f; b.vy = .55f; }
 }
 
@@ -1412,23 +1421,36 @@ void GameView::updateRefugeGames(float seconds)
     for (int kind = 0; kind < 2; ++kind)
     {
         auto& b = refugeBalls_[house][kind];
+        float simulationSeconds=seconds;
         if (b.carrier >= 0)
         {
             const auto player = b.carrier == networkSelfSlot_ ? localPlayer() : remote_[b.carrier];
             const float px = player.x - (safehouses_[house].col + .5f);
             const float pz = player.z - (safehouses_[house].row + .5f);
             if (!player.present || player.elevation < refugeUpperFloor - .05f || std::abs(px) > 2.f || std::abs(pz) > 2.f)
-            { b.carrier = -1; b.vx = b.vy = b.vz = 0.f; }
+            { b.carrier = -1; b.throwWindup=0.f;b.vx = b.vy = b.vz = 0.f; }
             else
             {
-                b.x = std::clamp(px + std::sin(player.angle) * .52f, -1.95f, .75f);
-                b.z = std::clamp(pz + std::cos(player.angle) * .52f, -1.95f, 1.95f);
-                b.y = .54f - (player.crouched?.30f:0.f) + player.jumpHeight; continue;
+                const bool releasing=b.throwWindup>0.f;
+                const float spent=std::min(simulationSeconds,b.throwWindup);
+                b.throwWindup=std::max(0.f,b.throwWindup-spent);simulationSeconds-=spent;
+                const float prepare=releasing?std::sin(interactionSmooth(1.f-b.throwWindup/.28f)*pi):0.f;
+                const float reach=.52f-.10f*prepare;
+                b.x = std::clamp(px + std::sin(player.angle) * reach, -1.95f, .75f);
+                b.z = std::clamp(pz + std::cos(player.angle) * reach, -1.95f, 1.95f);
+                b.y = .54f+.07f*prepare - (player.crouched?.30f:0.f) + player.jumpHeight;
+                if(!releasing || b.throwWindup>0.f)continue;
+                if(b.carrier==networkSelfSlot_)
+                {
+                    lastHeldBall_={safehouses_[house].col+.5f+b.x,refugeUpperFloor+b.y,safehouses_[house].row+.5f+b.z};
+                    throwClock_=.4f;heldBallLast_=false;
+                }
+                b.carrier=-1;b.vx=std::sin(player.angle)*2.4f;b.vz=std::cos(player.angle)*2.4f;b.vy=3.f;
             }
         }
         // Small fixed substeps keep hoop crossings and fast wall impacts stable.
-        int steps = std::max(1, static_cast<int>(std::ceil(seconds / .008f)));
-        const float dt = seconds / steps;
+        int steps = std::max(1, static_cast<int>(std::ceil(simulationSeconds / .008f)));
+        const float dt = simulationSeconds / steps;
         for (int i = 0; i < steps; ++i)
         {
             const float previousY = b.y;
@@ -2586,8 +2608,11 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             std::ifstream open(models/(name+".nxm"),std::ios::binary),grip(models/(name+"-grip.nxm"),std::ios::binary);
             handOpen_[side]=readCreatureMesh(open);handGrip_[side]=readCreatureMesh(grip);
             if(handOpen_[side] && handGrip_[side] && (handOpen_[side]->indices!=handGrip_[side]->indices || handOpen_[side]->vertices.size()!=handGrip_[side]->vertices.size())) handGrip_[side].reset();
+            std::ifstream rig(models/(side==0?"arms-l.nxr":"arms-r.nxr"),std::ios::binary);
+            handRigs_[side]=HandMotion::readRig(rig);
         }
         handTexture_=loadSurfaceTexture(models/"survivor.png",1024);
+        handSkinTexture_=loadSurfaceTexture(models/"hands-skin.png",2048);
         handsAttempted_=true;
     }
     // First-person source meshes follow the camera, never a procedural hand.
@@ -2608,7 +2633,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     for (int side=0;side<2;++side)
     {
         const float sway=std::sin(bobPhase_+side*1.2f)*bobBlend_*.007f;
-        InteractionPoint pose{side==0?-.16f:.16f,-.12f+sway-crouchBlend_*.012f,-.31f};
+        InteractionPoint pose{(side==0?-.16f:.16f)+handInertia_.x,-.12f+sway-crouchBlend_*.012f+handInertia_.y,-.31f};
         float gripRotation=0.f,gripAmount=.5f*ballHoldBlend_,wristPitch=0.f;
         if(heldHouse>=0)
         {
@@ -2616,16 +2641,26 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             const auto centre=safehouses_[heldHouse];
             const auto at=toCamera({centre.col+.5f+ball.x,refugeUpperFloor+ball.y,centre.row+.5f+ball.z});
             pose.x+=(at.x+(side==0?-.13f:.13f)-pose.x)*ballHoldBlend_;
-            pose.y+=(at.y-.035f-pose.y)*ballHoldBlend_;pose.z+=(at.z+.025f-pose.z)*ballHoldBlend_;
-            gripRotation=(side==0?-55.f:55.f)*ballHoldBlend_;gripAmount=.65f*ballHoldBlend_;
+            pose.y+=(at.y-.035f-pose.y)*ballHoldBlend_;pose.z+=(at.z+.09f-pose.z)*ballHoldBlend_;
+            gripRotation=(side==0?-55.f:55.f)*ballHoldBlend_;gripAmount=.35f*ballHoldBlend_;
         }
         else if(throwClock_>0.f)
-        { const float follow=std::sin((.4f-throwClock_)/.4f*pi); pose.y+=.035f*follow;pose.z-=.16f*follow; }
+        {
+            const float phase=std::clamp((.4f-throwClock_)/.4f,0.f,1.f);
+            const float withdraw=1.f-interactionSmooth(phase);
+            const float follow=interactionSmooth(std::sin(phase*pi));
+            const auto at=toCamera({lastHeldBall_.x,lastHeldBall_.y,lastHeldBall_.z});
+            pose.x+=(at.x+(side==0?-.13f:.13f)-pose.x)*withdraw;
+            pose.y+=(at.y-.035f-pose.y)*withdraw+.055f*follow;
+            pose.z+=(at.z+.09f-pose.z)*withdraw-.10f*follow;
+            gripRotation=(side==0?-55.f:55.f)*withdraw;
+            gripAmount=.35f*(1.f-interactionSmooth(std::min(1.f,phase*3.f)));
+        }
         if(side==1 && drinkClock_>0.f)
         {
             const float sip=std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
             pose={.14f-.10f*sip,-.15f+.12f*sip,-.36f+.06f*sip};
-            gripRotation=-35.f*sip;gripAmount=.85f*std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
+            gripRotation=-35.f*sip;wristPitch=-55.f*sip;gripAmount=.55f*std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
         }
         else if(side==1 && nearbySlotHandle()>=0)
         {
@@ -2635,23 +2670,48 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             {
                 const auto knob=toCamera(slotKnobPoint(safehouses_[house],elapsed_,machine.stopTime));
                 const float reach=slotHandReach(elapsed_,machine.stopTime);
-                pose.x+=(knob.x-.025f-pose.x)*reach; pose.y+=(knob.y-.015f-pose.y)*reach;pose.z+=(knob.z+.04f-pose.z)*reach;
+                pose.x+=(knob.x-.005f-pose.x)*reach; pose.y+=(knob.y+.025f-pose.y)*reach;pose.z+=(knob.z+.055f-pose.z)*reach;
                 gripRotation=25.f*reach;
                 gripAmount=slotHandGrip(elapsed_,machine.stopTime);
                 wristPitch=slotLeverDegrees(elapsed_,machine.stopTime)*.45f*reach;
             }
         }
+        if(handRigs_[side] && handSkinTexture_)
+        {
+            using namespace HandMotion;
+            const float lateral=side==0?-1.f:1.f;
+            const V shoulder{lateral*.22f,-.27f+sway*.3f,.015f};
+            V direction=axisAngle({1,0,0},wristPitch*.01745329252f)*V{0,.25f,-1.f};
+            V across{-lateral,0,0};float handRoll=gripRotation*.01745329252f;
+            if(side==1 && drinkClock_>0.f)
+            {
+                const float sip=std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
+                const R cup=axisAngle({0,0,1},handRoll)*axisAngle({1,0,0},-55.f*sip*.01745329252f);
+                direction=cup*V{-1,0,0};across=cup*V{0,1,0};handRoll=0.f;
+            }
+            skin(*handRigs_[side],handPoses_[side],shoulder,{pose.x,pose.y,pose.z},direction,
+                across,gripAmount,handRoll);
+            glBindTexture(GL_TEXTURE_2D,handSkinTexture_);
+            glBegin(GL_TRIANGLES);
+            for(const auto index:handRigs_[side]->indices)
+            {
+                const auto& v=handPoses_[side].vertices[index];
+                glTexCoord2fv(v.uv);glNormal3fv(v.normal);glVertex3fv(v.position);
+            }
+            glEnd();glBindTexture(GL_TEXTURE_2D,handTexture_);
+        }
         glPushMatrix();glTranslatef(pose.x,pose.y,pose.z);glRotatef(gripRotation,0.f,0.f,1.f);
         if(side==1 && drinkClock_>0.f && drinkMesh_)
         {
-            glPushMatrix();glTranslatef(-.035f,-.045f,-.035f);glScalef(.65f,.65f,.65f);
+            glPushMatrix();glTranslatef(.025f,-.045f,.05f);glScalef(.65f,.65f,.65f);
             const float sip=std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
             glRotatef(-55.f*sip,1.f,0.f,0.f);
             glBindTexture(GL_TEXTURE_2D,drinkTexture_);glColor3f(.65f,.80f,.87f);glCallList(drinkMesh_);
             glColor3f(1.f,1.f,1.f);glBindTexture(GL_TEXTURE_2D,handTexture_);glPopMatrix();
         }
         glRotatef(35.f+wristPitch,1.f,0.f,0.f);glRotatef(180.f,0.f,1.f,0.f);
-        if(handOpen_[side] && handGrip_[side])
+        if(handRigs_[side] && handSkinTexture_) { /* Source rig was drawn in camera space above. */ }
+        else if(handOpen_[side] && handGrip_[side])
         {
             const auto& open=*handOpen_[side];const auto& grip=*handGrip_[side];
             const float fingerBlend=std::clamp(gripAmount,0.f,1.f);

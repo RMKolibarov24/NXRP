@@ -35,6 +35,22 @@ The converter is not needed to build or run the game.
 
 # First-person hands
 
+The primary first-person arms are now `arms-l.nxr`, `arms-r.nxr` and
+`hands-skin.png`, extracted from the **unsimplified** anatomical body in the
+same CC0 Innerscene/MakeHuman source linked above. Left/right retain 16,840
+source triangles each, 10,659/10,668 vertices and 19/20 original source bones.
+The original skin image is kept separately instead of reducing it to an atlas
+tile. No vertices, triangles or replacement model geometry are authored.
+
+Runtime evaluates the original parent hierarchy and skin weights, with two-bone
+shoulder/elbow/wrist IK and individual finger-joint rotations. NXR1 stores
+bounded vertex/index/bone counts, palm frame, bind transforms, parents, joint
+roles, source vertices/UVs/weights/joints and uint32 indices. The loader rejects
+invalid counts, hierarchy, rotations, weights, indices and nonfinite values.
+Regenerate with `python tools/prepare_hand_rigs.py path/to/jog-maya.glb`
+using numpy, Pillow and pygltflib. The legacy NXM hands below remain fallback
+assets if a rig or its skin texture cannot be loaded.
+
 `hands-l.nxm` and `hands-r.nxm` are extracted from the same downloaded CC0
 Innerscene/MakeHuman Jog Maya source listed above, using its original hand and
 forearm triangles, UVs and `survivor.png` skin texture. No hand geometry is

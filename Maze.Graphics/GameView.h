@@ -12,6 +12,7 @@
 #include "Maze.Puzzle.h"
 #include "Maze.Safehouse.h"
 #include "Maze.CreatureMesh.h"
+#include "HandRig.h"
 
 struct GameInput
 {
@@ -50,6 +51,7 @@ struct RefugeBall
 {
     float x = 0.f, y = .13f, z = 0.f;
     float vx = 0.f, vy = 0.f, vz = 0.f;
+    float throwWindup = 0.f;
     int carrier = -1;
     unsigned scoreA = 0, scoreB = 0;
 };
@@ -153,6 +155,9 @@ private:
     bool refugePropsAttempted_ = false;
     std::array<unsigned int,2> handMeshes_{};
     std::array<std::optional<CreatureMesh>,2> handOpen_{}, handGrip_{};
+    std::array<std::optional<HandMotion::Rig>,2> handRigs_{};
+    std::array<HandMotion::Pose,2> handPoses_{};
+    unsigned int handSkinTexture_=0;
     unsigned int handTexture_ = 0;
     bool handsAttempted_ = false;
     unsigned int creatureMesh_ = 0, creatureTexture_ = 0;
@@ -203,6 +208,7 @@ private:
     int seatedHouse_ = -1;
     float seatedBlend_ = 0.f, ballHoldBlend_ = 0.f, throwClock_ = 0.f;
     bool heldBallLast_ = false;
+    HandMotion::V lastHeldBall_{},handInertia_{};
     std::array<float, maxCoopPlayers> drinkCooldowns_{};
     std::array<std::uint32_t, maxCoopPlayers> drinks_{};
     std::uint32_t seenDrink_ = 0;

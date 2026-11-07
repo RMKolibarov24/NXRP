@@ -12,7 +12,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'assets') -Destination $destination -Rec
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/PLAY.md') -Destination $destination
 $sourceCommit = git -C $repo rev-parse HEAD
-"Source commit: $sourceCommit`nBuilt for Windows x64; co-op protocol 11." |
+"Source commit: $sourceCommit`nBuilt for Windows x64; co-op protocol 12." |
     Set-Content -LiteralPath (Join-Path $destination 'VERSION.txt') -Encoding ascii
 $notices = Join-Path $destination 'licenses'
 New-Item -ItemType Directory -Path $notices | Out-Null

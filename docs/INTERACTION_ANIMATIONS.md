@@ -1,5 +1,25 @@
 # Physical interaction animation fixes
 
+## Runtime skeletal arms
+
+The primary arms use the unsimplified downloaded MakeHuman mesh and skin with
+the original finger bones and vertex weights. Two-bone IK places the wrist and
+elbow without stretching arm segments. Each finger joint rotates at runtime;
+the old open/grip vertex morph remains only as a fallback. Idle arms have
+restrained camera-turn lag. Object contact overrides that lag.
+
+Basketball throws keep host-owned possession for a 0.28-second wind-up. The ball
+and hands draw back together, then release; follow-through begins at the actual
+release position and returns smoothly while fingers open. Duplicate throws
+cannot restart wind-up. Loss of possession/upper-floor eligibility cancels it.
+Protocol 12 includes the bounded wind-up state so co-op players share its phase.
+All players must use the same new build.
+
+Smoke checks cover original high-resolution rig loading, finger deformation,
+finite singular/unreachable IK solutions, preserved arm lengths, reachable
+wrist targets, malformed rig headers, shared TCP wind-up, delayed physical
+release, hoop scoring and rendered hold/wind-up/release/drink/lever poses.
+
 ## Slot motion refinement
 
 The sourced lever now uses quintic easing through reach, pull, hold and return,

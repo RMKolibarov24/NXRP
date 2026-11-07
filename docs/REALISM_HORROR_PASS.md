@@ -7,9 +7,12 @@ package, fork PR #6 updates and visible launch. Never author new model geometry.
 ## Requirements and authoritative status
 
 1. Higher-quality downloaded hands, runtime skeletal animation and IK, finger
-   contact, weighted arms and throwing anticipation/follow-through: **unfinished**.
-   Existing hands use the downloaded MakeHuman source with baked grip morphs.
-   They still need full-resolution source extraction, runtime skinning and IK.
+   contact, weighted arms and throwing anticipation/follow-through: implemented
+   unsimplified source arms, original runtime bone hierarchy/skin weights,
+   two-bone IK, finger joints, restrained camera inertia and 0.28s shared throw
+   wind-up with continuous release/follow-through. See HandRig.h,
+   prepare_hand_rigs.py and INTERACTION_ANIMATIONS.md. Final play/pose review
+   remains required. Legacy morph hands are retained only as fallback.
 2. Roughness/normal maps, softer shadows, wet reflections and readable fog:
    **unfinished**. Existing screen-space reflection/contact shading is not proof
    of material maps or soft shadows. Source suitable maps and render-verify.
@@ -47,7 +50,7 @@ package, fork PR #6 updates and visible launch. Never author new model geometry.
   within 12 units; playback applies pan, distance, wall/door/floor filtering.
   Audible speech generates hunter noise. Bounded queues drop speech ahead of
   gameplay congestion. Two 20ms output buffers and four-frame peer queues bound
-  latency. Protocol 11 requires all co-op players to update together.
+  latency. Protocol 12 requires all co-op players to update together.
   Synthetic real-TCP tests cover codec/parser bounds, identity spoofing, stale
   generation/replay/rate rejection, no self echo, mute and range. All fixtures
   disable audio device I/O: **actual microphone-to-remote-speaker testing remains
@@ -74,9 +77,9 @@ Graphics build copies assets; CoopSmoke does not. Unit runner is VS vstest.conso
 
 ## Next work
 
-1. Preserve/checkpoint current acoustic, fair-AI and voice code after final smoke.
-2. Extract unsimplified source arms and original rig; implement runtime skeletal
-   skinning, two-bone IK, shaped finger contact and weighted throwing phases.
+1. Acoustic, fair-AI and voice checkpoint f81eb21 is pushed to PR #6.
+2. Verify and checkpoint the new source rigs and weighted throw pipeline; review
+   object contact and third-party licensing attribution before final delivery.
 3. Download/attribute material maps; implement normal/roughness-driven lighting,
    softer shadows and restrained wet reflections, then inspect renders.
 4. Download licensed story props and build connected notes/distinct maze sections.
@@ -88,3 +91,17 @@ Graphics build copies assets; CoopSmoke does not. Unit runner is VS vstest.conso
 Voice API references: Microsoft waveInOpen and Devices and Data Types:
 https://learn.microsoft.com/en-us/windows/win32/api/mmeapi/nf-mmeapi-waveinopen
 https://learn.microsoft.com/en-us/windows/win32/multimedia/devices-and-data-types
+
+## Skeletal arm checkpoint
+
+New primary NXR rigs preserve the unsimplified downloaded anatomical body,
+original hierarchy/weights and separate full-size source skin. Graphics and
+CoopSmoke Release/x64 build without warnings. The expanded real four-player
+TCP smoke passes with rig load/deformation, arm length/wrist-target checks,
+singular/unreachable IK, malformed header rejection, shared wind-up state,
+delayed release, actual hoop scoring and all previous gameplay/voice checks.
+Rendered basketball hold, wind-up, release, lever contact and drinking frames
+were inspected. The drinking wrist frame now follows the vessel orientation;
+source meshes are never replaced with authored geometry. Protocol is now 12.
+Final broad pass packaging, listening, play balance and voice hardware checks
+remain outstanding; do not mark the six-part goal complete at this checkpoint.
