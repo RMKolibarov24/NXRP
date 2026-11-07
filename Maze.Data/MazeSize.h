@@ -1,7 +1,8 @@
 #pragma once
 
 constexpr int MIN_MAZE_SIZE = 10;
-constexpr int MAX_MAZE_SIZE = 50;
+constexpr int MAX_MAZE_SIZE = 100;
+constexpr int DEFAULT_MAZE_SIZE = 30;
 
 class MazeSize
 {

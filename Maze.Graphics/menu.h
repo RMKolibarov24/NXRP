@@ -16,6 +16,9 @@ enum class MenuAction
     RestartMaze,
     HowToPlay,
     Settings,
+    Multiplayer,
+    HostGame,
+    JoinGame,
     ApplySettings,
     Back,
     Exit
@@ -32,6 +35,8 @@ public:
     void showMain();
     void showHowToPlay();
     void showSettings(const MazeSize& selectedSize, std::optional<std::uint32_t> seed = std::nullopt);
+    void showMultiplayer();
+    const std::string& multiplayerAddress() const noexcept { return multiplayerAddress_; }
     void showVictory(const MazeSize& completedSize, const GameStatistics& statistics,
         std::optional<std::uint32_t> seed = std::nullopt);
     void showMessage(const std::string& message);
@@ -43,7 +48,7 @@ public:
     void draw(sf::RenderTarget& target) const;
 
 private:
-    enum class Screen { Main, HowToPlay, Settings, Victory };
+    enum class Screen { Main, HowToPlay, Settings, Multiplayer, Victory };
 
     struct Button
     {
@@ -69,6 +74,7 @@ private:
     bool canRestart_ = false;
     std::string notice_;
     std::string draftSeedText_;
+    std::string multiplayerAddress_ = "127.0.0.1:24816";
     bool seedFocused_ = false;
 
     sf::Text title_;
@@ -85,9 +91,14 @@ private:
     sf::Text sizeSummary_;
     sf::Text seedLabel_;
     sf::Text seedValue_;
+    sf::Text addressLabel_;
+    sf::Text addressValue_;
     sf::RectangleShape seedField_;
-    std::array<Button, 6> mainButtons_;
+    sf::RectangleShape addressField_;
+    std::array<Button, 7> mainButtons_;
     std::array<Button, 4> sizeButtons_;
     Button backButton_;
     Button applyButton_;
+    Button hostButton_;
+    Button joinButton_;
 };

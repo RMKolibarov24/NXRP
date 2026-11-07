@@ -2,8 +2,8 @@
 
 These Mermaid flowcharts describe the implemented functions and render directly
 on GitHub. The defense presentation also contains an editable generation diagram.
-Updated for source `cf3de4f` on **2 November 2026**. The production implementation
-matches the `9fd92aa` feature-regression source.
+The movement and controller diagrams below also describe the earlier grid-based
+interface; the first-person systems are documented in the README.
 
 ## Maze generation
 
@@ -20,13 +20,15 @@ flowchart TD
     G --> D
     F -- No --> H["Pop room to backtrack"]
     H --> D
-    D -- Yes --> I["Extend last room to bottom-right<br/>Mark bottom-right Exit"]
+    D -- Yes --> K["Open seeded shortcuts between connected passages"]
+    K --> I["Extend last room to bottom-right<br/>Mark bottom-right Exit"]
     I --> J(["Return owned MazeGrid"])
 ```
 
 Invalid dimensions throw before allocation. Unvisited rooms still contain Wall.
 Every stack entry has even row and column indices. A completed grid contains
-one Exit at `(rows - 1, cols - 1)`. Time and auxiliary stack space are
+one Exit at `(rows - 1, cols - 1)`. A seeded selection of walls is opened after
+the initial spanning tree to create loops and alternate escape routes. Time and auxiliary stack space are
 O(rows * cols).
 
 For 10 by 10, the last room is `(8, 8)`. The extension opens `(9, 8)` and `(9, 9)`

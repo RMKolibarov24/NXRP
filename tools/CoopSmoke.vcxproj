@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{30A1B797-BC74-418B-8ABA-52B0EBFA9F85}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType><PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet><UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="..\ProjectDefaults.props" />
+    <Import Project="$(NXRPRepoRoot)build\dependencies\NXRP.SFML.Release.props" Condition="Exists('$(NXRPRepoRoot)build\dependencies\NXRP.SFML.Release.props')" />
+  </ImportGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(NXRPRepoRoot)Maze.Graphics;$(NXRPRepoRoot)Maze.Data;$(NXRPRepoRoot)Maze.Logic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- The smoke checks use assert in the Release-linked fixture. -->
+      <PreprocessorDefinitions>SFML_STATIC</PreprocessorDefinitions>
+    </ClCompile>
+    <Link><AdditionalDependencies>opengl32.lib;winmm.lib;ws2_32.lib;shell32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="CoopSmoke.cpp" />
+    <ClCompile Include="..\Maze.Graphics\menu.cpp" />
+    <ClCompile Include="..\Maze.Graphics\Soundscape.cpp" />
+    <ClCompile Include="..\Maze.Graphics\Multiplayer.cpp" />
+    <ClCompile Include="..\Maze.Graphics\ExecutablePath.cpp" />
+    <ClCompile Include="..\Maze.Graphics\SettingsPath.cpp" />
+    <ClCompile Include="..\Maze.Graphics\GameStatisticsText.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Maze.Data\Maze.Data.vcxproj"><Project>{475783e0-f973-4fb5-b474-d6d3fad37bbb}</Project></ProjectReference>
+    <ProjectReference Include="..\Maze.Logic\Maze.Logic.vcxproj"><Project>{809766bc-631a-4592-af2f-271572e7a21c}</Project></ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CheckPreparedDependencies" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(NXRPRepoRoot)build\dependencies\NXRP.SFML.Release.props')" Text="Prepare Release SFML dependencies before running the co-op smoke test." />
+  </Target>
+</Project>

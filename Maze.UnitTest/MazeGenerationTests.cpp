@@ -2,6 +2,7 @@
 #include "CppUnitTest.h"
 #include "Maze.Game.h"
 #include "Maze.Generation.h"
+#include "Maze.Safehouse.h"
 
 #include <algorithm>
 #include <climits>
@@ -21,7 +22,7 @@ namespace MazeUnitTest
     {
         constexpr std::uint32_t fixedSeeds[] = { 0, 1, 42, 12345, 0x80000000U, UINT32_MAX };
         const MazeSize invalidSizes[] = {
-            { 9, 10 }, { 51, 10 }, { 10, 9 }, { 10, 51 }, { 0, 10 }, { 10, 0 },
+            { 9, 10 }, { 101, 10 }, { 10, 9 }, { 10, 101 }, { 0, 10 }, { 10, 0 },
             { -1, -1 }, { INT_MIN, 10 }, { INT_MAX, 10 }, { 10, INT_MIN }, { 10, INT_MAX }
         };
 
@@ -119,6 +120,80 @@ namespace MazeUnitTest
     TEST_CLASS(MazeGenerationTests)
     {
     public:
+        TEST_METHOD(SeededSafehousesAreDistinctOpenAndReproducible)
+        {
+            const MazeSize sizes[] = { {10,10}, {10,100}, {30,30}, {99,100}, {100,100} };
+            for (const auto size : sizes) for (std::uint32_t seed = 0; seed < 32; ++seed)
+            {
+                const auto maze = generateMaze(size, seed);
+                const auto houses = generateSafehouses(size, seed);
+                const auto replay = generateSafehouses(size, seed);
+                Assert::IsTrue(houses.size() >= 2 && houses.size() <= 4);
+                Assert::AreEqual(houses.size(), replay.size());
+                for (std::size_t i = 0; i < houses.size(); ++i)
+                {
+                    Assert::IsTrue(houses[i].row == replay[i].row && houses[i].col == replay[i].col);
+                    Assert::IsFalse(insideSafehouse({0,0}, houses[i]));
+                    Assert::IsFalse(insideSafehouse({size.rows-1,size.cols-1}, houses[i]));
+                    for (int row = houses[i].row-1; row <= houses[i].row+1; ++row)
+                        for (int col = houses[i].col-1; col <= houses[i].col+1; ++col)
+                        {
+                            Assert::IsTrue(maze.at(row,col) == MazeCell::Passage);
+                            Assert::AreEqual(static_cast<int>(i), safehouseAt({row,col}, houses));
+                        }
+                    Assert::IsTrue(maze.at(houses[i].row - 2, houses[i].col) == MazeCell::Passage);
+                    Assert::IsTrue(maze.at(houses[i].row + 2, houses[i].col) == MazeCell::Passage);
+                    Assert::IsTrue(maze.at(houses[i].row, houses[i].col - 2) == MazeCell::Passage);
+                    Assert::IsTrue(maze.at(houses[i].row, houses[i].col + 2) == MazeCell::Passage);
+                }
+            }
+        }
+
+        TEST_METHOD(RefugesDoNotDisconnectHunterRoutes)
+        {
+            const MazeSize sizes[] = { {10,10}, {10,100}, {30,30}, {65,90}, {100,100} };
+            for (const auto size : sizes) for (std::uint32_t seed = 0; seed < 32; ++seed)
+            {
+                const auto maze = generateMaze(size, seed);
+                const auto houses = generateSafehouses(size, seed);
+                std::vector<bool> reached(maze.cellCount(), false);
+                std::queue<MazePosition> pending; pending.push({0,0}); reached[0] = true;
+                constexpr MazePosition directions[] = { {-1,0}, {1,0}, {0,-1}, {0,1} };
+                while (!pending.empty())
+                {
+                    const auto current = pending.front(); pending.pop();
+                    for (const auto d : directions)
+                    {
+                        const MazePosition next{current.row+d.row,current.col+d.col};
+                        if (!maze.contains(next) || maze.at(next.row,next.col)==MazeCell::Wall || safehouseAt(next,houses)>=0) continue;
+                        const auto index = static_cast<std::size_t>(next.row*size.cols+next.col);
+                        if (!reached[index]) { reached[index]=true; pending.push(next); }
+                    }
+                }
+                for (int row=0; row<size.rows; ++row) for (int col=0; col<size.cols; ++col)
+                    if (maze.at(row,col)!=MazeCell::Wall && safehouseAt({row,col},houses)<0)
+                        Assert::IsTrue(reached[static_cast<std::size_t>(row*size.cols+col)]);
+            }
+        }
+        TEST_METHOD(SeededMazesIncludeAlternateRoutes)
+        {
+            const MazeSize sizes[] = { {10, 10}, {11, 12}, {30, 25}, {50, 50} };
+            for (const auto size : sizes) for (std::uint32_t seed = 0; seed < 16; ++seed)
+            {
+                const auto maze = generateMaze(size, seed);
+                int vertices = 0, edges = 0;
+                for (int row = 0; row < size.rows; ++row) for (int col = 0; col < size.cols; ++col)
+                {
+                    if (maze.at(row, col) == MazeCell::Wall) continue;
+                    ++vertices;
+                    if (row + 1 < size.rows && maze.at(row + 1, col) != MazeCell::Wall) ++edges;
+                    if (col + 1 < size.cols && maze.at(row, col + 1) != MazeCell::Wall) ++edges;
+                }
+                // For a connected graph, at least as many edges as vertices means a cycle.
+                Assert::IsTrue(edges >= vertices);
+            }
+        }
+
         TEST_METHOD(GeneratesMinimumSizeWithReachableExit)
         {
             AssertSizeForFixedSeeds({ 10, 10 });
@@ -131,7 +206,7 @@ namespace MazeUnitTest
 
         TEST_METHOD(GeneratesMaximumSizeWithReachableExit)
         {
-            AssertSizeForFixedSeeds({ 50, 50 });
+            AssertSizeForFixedSeeds({ MAX_MAZE_SIZE, MAX_MAZE_SIZE });
         }
 
         TEST_METHOD(SupportsEvenAndOddRectangles)
@@ -181,9 +256,9 @@ namespace MazeUnitTest
 
         TEST_METHOD(AllAllowedDimensionsHaveReachableExit)
         {
-            for (int rows = 10; rows <= 50; ++rows)
+            for (int rows = MIN_MAZE_SIZE; rows <= MAX_MAZE_SIZE; ++rows)
             {
-                for (int cols = 10; cols <= 50; ++cols)
+                for (int cols = MIN_MAZE_SIZE; cols <= MAX_MAZE_SIZE; ++cols)
                 {
                     const MazeSize size(rows, cols);
                     const auto seed = static_cast<std::uint32_t>(rows * 100 + cols);

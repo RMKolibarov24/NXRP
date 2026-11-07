@@ -5,9 +5,56 @@
 #include "Maze.Validation.h"
 #include "SettingsPath.h"
 
+#include <algorithm>
 #include <exception>
+#include <charconv>
+#include <cmath>
 #include <iostream>
+#include <sstream>
 #include <utility>
+
+namespace
+{
+    bool parseAddress(std::string text, std::string& host, std::uint16_t& port)
+    {
+        if (text.rfind("tcp://", 0) == 0) text.erase(0, 6);
+        const auto colon = text.rfind(':');
+        if (colon == std::string::npos || colon == 0 || colon + 1 == text.size()) return false;
+        host = text.substr(0, colon);
+        if (host.size() > 253 || host.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-") != std::string::npos) return false;
+        unsigned value = 0;
+        const auto* first = text.data() + colon + 1; const auto* last = text.data() + text.size();
+        const auto parsed = std::from_chars(first, last, value);
+        if (parsed.ec != std::errc{} || parsed.ptr != last || value == 0 || value > 65535) return false;
+        port = static_cast<std::uint16_t>(value); return true;
+    }
+
+    char networkKey(sf::Keyboard::Key key)
+    {
+        if (key == sf::Keyboard::Key::E) return 'E';
+        if (key == sf::Keyboard::Key::Backspace) return 'B';
+        if (key == sf::Keyboard::Key::Enter) return 'N';
+        const sf::Keyboard::Key top[] = { sf::Keyboard::Key::Num1, sf::Keyboard::Key::Num2, sf::Keyboard::Key::Num3,
+            sf::Keyboard::Key::Num4, sf::Keyboard::Key::Num5, sf::Keyboard::Key::Num6,
+            sf::Keyboard::Key::Num7, sf::Keyboard::Key::Num8, sf::Keyboard::Key::Num9 };
+        const sf::Keyboard::Key pad[] = { sf::Keyboard::Key::Numpad1, sf::Keyboard::Key::Numpad2, sf::Keyboard::Key::Numpad3,
+            sf::Keyboard::Key::Numpad4, sf::Keyboard::Key::Numpad5, sf::Keyboard::Key::Numpad6,
+            sf::Keyboard::Key::Numpad7, sf::Keyboard::Key::Numpad8, sf::Keyboard::Key::Numpad9 };
+        for (int i = 0; i < 9; ++i) if (key == top[i] || key == pad[i]) return static_cast<char>('1' + i);
+        return 0;
+    }
+
+    sf::Keyboard::Key decodeNetworkKey(char key)
+    {
+        if (key == 'E') return sf::Keyboard::Key::E;
+        if (key == 'B') return sf::Keyboard::Key::Backspace;
+        if (key == 'N') return sf::Keyboard::Key::Enter;
+        const sf::Keyboard::Key keys[] = { sf::Keyboard::Key::Num1, sf::Keyboard::Key::Num2, sf::Keyboard::Key::Num3,
+            sf::Keyboard::Key::Num4, sf::Keyboard::Key::Num5, sf::Keyboard::Key::Num6,
+            sf::Keyboard::Key::Num7, sf::Keyboard::Key::Num8, sf::Keyboard::Key::Num9 };
+        return key >= '1' && key <= '9' ? keys[key - '1'] : sf::Keyboard::Key::Unknown;
+    }
+}
 
 MazeApplication::MazeApplication(const sf::Font& font)
     : MazeApplication(font, settingsFilePath())
@@ -16,7 +63,7 @@ MazeApplication::MazeApplication(const sf::Font& font)
 
 MazeApplication::MazeApplication(const sf::Font& font, std::filesystem::path settingsPath,
     Clock::time_point now)
-    : settingsPath_(std::move(settingsPath)), previousTick_(now), menu_(font), gameView_(font)
+    : settingsPath_(std::move(settingsPath)), previousTick_(now), previousFrame_(now), menu_(font), gameView_(font)
 {
     game_.selectedSize = loadMazeSizePreferences(settingsPath_);
     showMainMenu();
@@ -41,6 +88,7 @@ bool MazeApplication::canContinue() const noexcept
 
 bool MazeApplication::canRestart() const noexcept
 {
+    if (networkRole_ == NetworkRole::Guest) return false;
     return canContinue() || (game_.hasActiveGame() && game_.phase == GamePhase::Won);
 }
 
@@ -69,7 +117,180 @@ void MazeApplication::beginNewGame()
 
 void MazeApplication::restartCurrentGame()
 {
-    if (restartGame(game_)) gameView_.reset();
+    if (networkRole_ == NetworkRole::Guest) return;
+    gameView_.reset(&game_);
+    restartGame(game_);
+    if (networkRole_ == NetworkRole::Host) ++networkGeneration_;
+}
+
+void MazeApplication::endNetwork()
+{
+    network_.stop(); networkRole_ = NetworkRole::Solo; networkStatus_ = Multiplayer::Status::Idle;
+    networkPaused_ = false; joinedGeneration_ = 0; networkSlot_ = 0; networkSendClock_ = networkWaitClock_ = 0.f;
+    gameView_.setNetworkGuest(false); gameView_.remoteDisconnected();
+    gameView_.setNetworkStatus("");
+}
+
+void MazeApplication::sendPlayer()
+{
+    auto player = gameView_.localPlayer();
+    if (!player.present) return;
+    if (game_.phase != GamePhase::Playing || networkPaused_) player.moving = player.running = false;
+    std::ostringstream out; out.precision(8);
+    out << "P " << player.x << ' ' << player.z << ' ' << player.angle << ' ' << player.moving << ' ' << player.running;
+    network_.send(out.str());
+}
+
+void MazeApplication::updateNetwork(float seconds)
+{
+    if (networkRole_ == NetworkRole::Solo) return;
+    const auto status = network_.status();
+    if (status != networkStatus_)
+    {
+        networkStatus_ = status;
+        if (status == Multiplayer::Status::Connected)
+        {
+            if (networkRole_ == NetworkRole::Guest) menu_.showMessage("Connected. Waiting for the host's maze...");
+            networkSendClock_ = .1f;
+        }
+        else if (status == Multiplayer::Status::Listening && networkRole_ == NetworkRole::Host)
+            gameView_.setNetworkStatus("CO-OP 1/4 / WAITING");
+    }
+    for (const auto& message : network_.receive())
+    {
+        if (networkRole_ == NetworkRole::Host && message.kind == MultiplayerMessage::Kind::Joined)
+        {
+            gameView_.remoteDisconnected(message.peer);
+            gameView_.showNetworkNotice("A companion joined the maze.");
+            networkSendClock_ = .1f;
+            continue;
+        }
+        if (networkRole_ == NetworkRole::Host && message.kind == MultiplayerMessage::Kind::Left)
+        {
+            gameView_.remoteDisconnected(message.peer);
+            gameView_.showNetworkNotice("A companion left the maze.");
+            continue;
+        }
+        if (message.kind != MultiplayerMessage::Kind::Data) continue;
+        std::istringstream in(message.text); char type = 0; in >> type;
+        if (networkRole_ == NetworkRole::Guest && type == 'F')
+        {
+            endNetwork(); menu_.showMultiplayer(); menu_.showMessage("That game already has four players.");
+            return;
+        }
+        if (networkRole_ == NetworkRole::Host && type == 'P' && gameView_.initialized())
+        {
+            RemotePlayer player; int moving, running; std::string extra;
+            if (!(in >> player.x >> player.z >> player.angle >> moving >> running) || (in >> extra) ||
+                !std::isfinite(player.x) || !std::isfinite(player.z) || !std::isfinite(player.angle) ||
+                player.x < 0 || player.z < 0 || player.x >= game_.maze.size().cols || player.z >= game_.maze.size().rows ||
+                (moving != 0 && moving != 1) || (running != 0 && running != 1)) continue;
+            const MazePosition cell{ static_cast<int>(player.z), static_cast<int>(player.x) };
+            if (game_.maze.at(cell.row, cell.col) == MazeCell::Wall) continue;
+            player.moving = moving != 0; player.running = running != 0; player.present = true;
+            gameView_.setRemotePlayer(message.peer, player);
+            if (game_.maze.at(cell.row, cell.col) == MazeCell::Exit && gameView_.gateOpen() && game_.phase == GamePhase::Playing)
+            {
+                // A guest can only enter the exit after receiving the host's open-gate state.
+                game_.phase = GamePhase::Won;
+                menu_.setHasActiveGame(false); menu_.setCanRestart(canRestart());
+                menu_.showVictory(game_.maze.size(), game_.statistics, game_.mazeSeed);
+            }
+        }
+        else if (networkRole_ == NetworkRole::Host && type == 'K' && game_.phase == GamePhase::Playing)
+        {
+            char key = 0; std::string extra;
+            if (!(in >> key) || (in >> extra)) continue;
+            const auto code = decodeNetworkKey(key);
+            if (code == sf::Keyboard::Key::Unknown) continue;
+            sf::Event::KeyPressed event{}; event.code = code;
+            gameView_.handleRemoteEvent(message.peer, sf::Event{event}, game_);
+        }
+        else if (networkRole_ == NetworkRole::Guest && type == 'W')
+        {
+            unsigned version, generation, seed, phase; int rows, cols, selfSlot;
+            if (!(in >> version)) continue;
+            if (version != 3)
+            {
+                endNetwork(); menu_.showMultiplayer(); menu_.showMessage("Different game version. Everyone needs the same build.");
+                return;
+            }
+            if (!(in >> generation >> rows >> cols >> seed >> phase >> selfSlot) || generation == 0 ||
+                phase > 2 || selfSlot < 1 || selfSlot >= maxCoopPlayers || !isValidMazeSize({ rows, cols })) continue;
+            std::string world; std::getline(in, world);
+            const bool newGeneration = joinedGeneration_ != generation;
+            if (!newGeneration && networkSlot_ != selfSlot) continue;
+            if (newGeneration)
+            {
+                try
+                {
+                    gameView_.reset(&game_); startGame(game_, generateMaze({ rows, cols }, seed), seed);
+                    gameView_.setNetworkGuest(true); gameView_.update(game_, 0.f, GameInput{});
+                }
+                catch (const std::exception&) { continue; }
+            }
+            if (!game_.mazeSeed || *game_.mazeSeed != seed || game_.maze.size().rows != rows || game_.maze.size().cols != cols ||
+                !gameView_.applyWorldSnapshot(game_, world, selfSlot))
+            {
+                if (newGeneration) { gameView_.reset(&game_); endGame(game_); }
+                continue;
+            }
+            if (newGeneration) { joinedGeneration_ = generation; networkSlot_ = selfSlot; }
+            gameView_.setNetworkStatus("CO-OP " + std::to_string(gameView_.playerCount()) + "/4");
+            const bool wasPaused = networkPaused_;
+            networkPaused_ = phase == 1;
+            if (wasPaused != networkPaused_)
+                gameView_.showNetworkNotice(networkPaused_ ? "The host paused the game." : "The host resumed the game.");
+            if (phase == 2 && game_.phase != GamePhase::Won)
+            {
+                game_.phase = GamePhase::Won;
+                menu_.setHasActiveGame(false); menu_.setCanRestart(false);
+                menu_.showVictory(game_.maze.size(), game_.statistics, game_.mazeSeed);
+            }
+        }
+    }
+    if (status == Multiplayer::Status::Error || status == Multiplayer::Status::Disconnected)
+    {
+        const bool guest = networkRole_ == NetworkRole::Guest;
+        endNetwork();
+        if (guest) { endGame(game_); showMainMenu(); menu_.showMessage("Connection lost. Return to Multiplayer to try again."); }
+        else gameView_.showNetworkNotice("Connection lost. Continuing alone.");
+        return;
+    }
+    if (status == Multiplayer::Status::Connected && networkRole_ == NetworkRole::Guest && joinedGeneration_ == 0)
+    {
+        networkWaitClock_ += std::clamp(seconds, 0.f, .2f);
+        if (networkWaitClock_ > 10.f)
+        {
+            endNetwork(); endGame(game_); menu_.showMultiplayer();
+            menu_.showMessage("No compatible game received. Check the address and game version.");
+            return;
+        }
+    }
+    if (status != Multiplayer::Status::Connected) return;
+    if (networkRole_ == NetworkRole::Host)
+    {
+        int count = 1;
+        for (int slot = 1; slot < maxCoopPlayers; ++slot) if (network_.connectedMask() & (1u << slot)) ++count;
+        gameView_.setNetworkStatus("CO-OP " + std::to_string(count) + "/4");
+    }
+    networkSendClock_ += std::clamp(seconds, 0.f, .2f);
+    if (networkSendClock_ < .1f) return;
+    networkSendClock_ = 0.f;
+    if (networkRole_ == NetworkRole::Guest) sendPlayer();
+    else if (gameView_.initialized() && game_.mazeSeed)
+    {
+        const unsigned phase = game_.phase == GamePhase::Won ? 2u : game_.phase == GamePhase::Playing ? 0u : 1u;
+        const auto world = gameView_.worldSnapshot();
+        for (int slot = 1; slot < maxCoopPlayers; ++slot)
+        {
+            if (!(network_.connectedMask() & (1u << slot))) continue;
+            std::ostringstream out;
+            out << "W 3 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
+                << ' ' << *game_.mazeSeed << ' ' << phase << ' ' << slot << ' ' << world;
+            network_.send(out.str(), slot);
+        }
+    }
 }
 
 void MazeApplication::updateTime(Clock::time_point now)
@@ -86,6 +307,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
     updateTime(now);
     if (event.is<sf::Event::Closed>())
     {
+        endNetwork();
         endGame(game_);
         window.close();
         return;
@@ -102,14 +324,30 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         return;
     }
 
+    if (game_.phase == GamePhase::Playing && event.is<sf::Event::FocusLost>())
+    {
+        showMainMenu();
+        return;
+    }
     if (game_.phase == GamePhase::Playing)
     {
         const auto* key = event.getIf<sf::Event::KeyPressed>();
         if (key && key->code == sf::Keyboard::Key::Escape) showMainMenu();
         else if (key && key->code == sf::Keyboard::Key::R) restartCurrentGame();
+        else if (key && key->code == sf::Keyboard::Key::B) gameView_.toggleHeadMotion();
+        else if (key && key->code == sf::Keyboard::Key::M)
+        {
+            soundscape_.setMuted(!soundscape_.muted());
+            gameView_.setSoundMuted(soundscape_.muted());
+        }
         else
         {
-            gameView_.handleEvent(event, game_);
+            const char remoteKey = key && networkRole_ == NetworkRole::Guest && !networkPaused_ ? networkKey(key->code) : 0;
+            if (remoteKey)
+            {
+                sendPlayer(); network_.send(std::string("K ") + remoteKey);
+            }
+            else if (networkRole_ != NetworkRole::Guest) gameView_.handleEvent(event, game_);
             if (game_.phase == GamePhase::Won)
             {
                 menu_.setHasActiveGame(false);
@@ -128,7 +366,32 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
     case MenuAction::Settings:
         menu_.showSettings(game_.selectedSize, game_.selectedSeed);
         break;
+    case MenuAction::Multiplayer:
+        menu_.showMultiplayer();
+        break;
+    case MenuAction::HostGame:
+        endNetwork(); beginNewGame();
+        if (game_.phase == GamePhase::Playing)
+        {
+            gameView_.update(game_, 0.f, GameInput{});
+            networkRole_ = NetworkRole::Host; networkGeneration_ = 1;
+            network_.host(); networkStatus_ = Multiplayer::Status::Idle;
+            gameView_.setNetworkStatus("CO-OP 1/4 / WAITING");
+            gameView_.showNetworkNotice("Hosting on port 24816. Start ngrok and share its TCP address.");
+        }
+        break;
+    case MenuAction::JoinGame:
+    {
+        std::string host; std::uint16_t port;
+        if (!parseAddress(menu_.multiplayerAddress(), host, port))
+        { menu_.showMessage("Enter a TCP address like 1.tcp.ngrok.io:12345."); break; }
+        endNetwork(); networkRole_ = NetworkRole::Guest;
+        network_.join(host, port); networkStatus_ = Multiplayer::Status::Idle;
+        menu_.showMessage("Connecting...");
+        break;
+    }
     case MenuAction::Back:
+        if (networkRole_ == NetworkRole::Guest && joinedGeneration_ == 0) endNetwork();
         showMainMenu();
         break;
     case MenuAction::ApplySettings:
@@ -155,6 +418,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         break;
     }
     case MenuAction::NewGame:
+        endNetwork();
         beginNewGame();
         break;
     case MenuAction::RestartMaze:
@@ -168,6 +432,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         }
         break;
     case MenuAction::Exit:
+        endNetwork();
         endGame(game_);
         window.close();
         break;
@@ -176,10 +441,57 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
     }
 }
 
-void MazeApplication::update(sf::Vector2f mousePosition, Clock::time_point now)
+void MazeApplication::update(sf::RenderWindow& window, Clock::time_point now)
 {
     updateTime(now);
-    if (game_.phase != GamePhase::Playing) menu_.update(mousePosition);
+    const float seconds = std::chrono::duration<float>(now - previousFrame_).count();
+    previousFrame_ = now;
+    updateNetwork(seconds);
+    if (game_.phase == GamePhase::Playing && window.hasFocus())
+    {
+        const auto size = window.getSize();
+        const sf::Vector2i center{ static_cast<int>(size.x / 2), static_cast<int>(size.y / 2) };
+        if (!mouseCaptured_)
+        {
+            window.setMouseCursorGrabbed(true);
+            window.setMouseCursorVisible(false);
+            sf::Mouse::setPosition(center, window);
+            mouseCaptured_ = true;
+        }
+        else
+        {
+            const auto cursor = sf::Mouse::getPosition(window);
+            gameView_.look(static_cast<float>(cursor.x - center.x), static_cast<float>(cursor.y - center.y));
+            sf::Mouse::setPosition(center, window);
+        }
+        if (!networkPaused_) gameView_.update(game_, seconds);
+        if (networkRole_ == NetworkRole::Guest && game_.phase == GamePhase::Won)
+        {
+            // The host confirms the shared victory after receiving our position.
+            game_.phase = GamePhase::Playing; sendPlayer();
+        }
+        if (game_.phase == GamePhase::Won)
+        {
+            menu_.setHasActiveGame(false);
+            menu_.setCanRestart(canRestart());
+            menu_.showVictory(game_.maze.size(), game_.statistics, game_.mazeSeed);
+        }
+    }
+    gameView_.setSoundAvailability(soundscape_.status());
+    if (game_.phase == GamePhase::Playing && window.hasFocus())
+        soundscape_.setFrame(gameView_.soundFrame());
+    else
+        soundscape_.setFrame({});
+    if (game_.phase != GamePhase::Playing || !window.hasFocus())
+    {
+        if (mouseCaptured_)
+        {
+            window.setMouseCursorGrabbed(false);
+            window.setMouseCursorVisible(true);
+            mouseCaptured_ = false;
+        }
+        menu_.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
+    }
 }
 
 void MazeApplication::draw(sf::RenderTarget& target)

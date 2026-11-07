@@ -1,6 +1,8 @@
 #include "Maze.Generation.h"
 #include "Maze.Validation.h"
+#include "Maze.Safehouse.h"
 
+#include <algorithm>
 #include <random>
 #include <charconv>
 #include <stdexcept>
@@ -42,6 +44,33 @@ MazeGrid generateMaze(const MazeSize& size, std::uint32_t seed)
         path.push_back(next);
     }
 
+    // Open a seeded selection of interior walls to create alternate routes.
+    // The original spanning tree remains intact, so every passage stays reachable.
+    std::vector<MazePosition> shortcuts;
+    for (int row = 1; row < size.rows - 1; ++row)
+        for (int col = 1; col < size.cols - 1; ++col)
+        {
+            if (maze.at(row, col) != MazeCell::Wall) continue;
+            const bool vertical = maze.at(row-1, col) == MazeCell::Passage && maze.at(row+1, col) == MazeCell::Passage;
+            const bool horizontal = maze.at(row, col-1) == MazeCell::Passage && maze.at(row, col+1) == MazeCell::Passage;
+            if (vertical || horizontal) shortcuts.push_back({ row, col });
+        }
+    std::shuffle(shortcuts.begin(), shortcuts.end(), random);
+    const auto rooms = static_cast<std::size_t>((size.rows + 1) / 2) * static_cast<std::size_t>((size.cols + 1) / 2);
+    const auto shortcutCount = std::min(shortcuts.size(), std::max<std::size_t>(2, rooms / 8));
+    for (std::size_t i = 0; i < shortcutCount; ++i)
+        maze.at(shortcuts[i].row, shortcuts[i].col) = MazeCell::Passage;
+
+    // Carve refuges without removing any part of the original spanning tree.
+    for (const auto center : generateSafehouses(size, seed))
+    {
+        // A walkable outer ring lets the hunter route around the protected
+        // 3x3 interior even when the original maze passed through this spot.
+        for (int row = center.row - 2; row <= center.row + 2; ++row)
+            for (int col = center.col - 2; col <= center.col + 2; ++col)
+                maze.at(row, col) = MazeCell::Passage;
+    }
+
     // For even dimensions the last row/column lies beyond the room lattice.
     // Extend its already-connected bottom-right room by at most two cells.
     const int lastRow = size.rows - 1;
@@ -59,7 +88,7 @@ MazeGrid generateMaze(const MazeSize& size, std::uint32_t seed)
 MazeGrid generateMaze(const MazeSize& size)
 {
     if (!isValidMazeSize(size))
-        throw std::invalid_argument("Maze dimensions must each be between 10 and 50.");
+        throw std::invalid_argument("Maze dimensions must each be between 10 and 100.");
     return generateMaze(size, generateMazeSeed());
 }
 
