@@ -11,7 +11,9 @@
 struct Soundscape::Impl
 {
     std::atomic<bool> stop{ false }, muted{ false }, active{ false }, moving{ false }, running{ false }, hunterMoving{ false }, hunterChasing{ false };
-    std::atomic<bool> doorSlam{ false };
+    std::atomic<bool> doorSlam{ false }, slotSpinning{ false }, slotJackpot{ false };
+    std::atomic<float> slotPan{ 0.f };
+    std::atomic<std::uint32_t> slotEvent{ 0 }, drinkEvent{ 0 };
     std::atomic<float> threat{ 0.f }, shifting{ 0.f }, hunterPan{ 0.f }, shiftingPan{ 0.f }, hunterStepSeconds{ 1.f };
     std::atomic<float> fear{ 0.f }, doorPan{ 0.f }, whisperPan{ 0.f };
     std::atomic<int> status{ 0 };
@@ -28,6 +30,8 @@ struct Soundscape::Impl
         result.hunterMoving = hunterMoving.load(); result.hunterStepSeconds = hunterStepSeconds.load();
         result.hunterChasing = hunterChasing.load();
         result.thunderEvent = thunderEvent.load();
+        result.slotSpinning=slotSpinning.load(); result.slotJackpot=slotJackpot.load(); result.slotPan=slotPan.load();
+        result.slotEvent=slotEvent.load(); result.drinkEvent=drinkEvent.load();
         result.fear = fear.load();
         result.doorEvent = doorEvent.load(); result.doorPan = doorPan.load(); result.doorSlam = doorSlam.load();
         result.whisperEvent = whisperEvent.load(); result.whisperPan = whisperPan.load();
@@ -111,7 +115,9 @@ void Soundscape::setFrame(const SoundscapeFrame& frame) noexcept
     impl_->hunterMoving.store(frame.hunterMoving); impl_->hunterChasing.store(frame.hunterChasing);
     impl_->hunterStepSeconds.store(frame.hunterStepSeconds);
     impl_->thunderEvent.store(frame.thunderEvent); impl_->active.store(frame.active);
-    impl_->fear.store(frame.fear); impl_->doorEvent.store(frame.doorEvent);
+    impl_->fear.store(frame.fear);
+    impl_->slotSpinning.store(frame.slotSpinning); impl_->slotJackpot.store(frame.slotJackpot); impl_->slotPan.store(frame.slotPan);
+    impl_->slotEvent.store(frame.slotEvent); impl_->drinkEvent.store(frame.drinkEvent); impl_->doorEvent.store(frame.doorEvent);
     impl_->doorPan.store(frame.doorPan); impl_->doorSlam.store(frame.doorSlam);
     impl_->whisperEvent.store(frame.whisperEvent); impl_->whisperPan.store(frame.whisperPan);
 }

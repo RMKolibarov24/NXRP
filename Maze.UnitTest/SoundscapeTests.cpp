@@ -13,6 +13,22 @@ namespace MazeUnitTest
     TEST_CLASS(SoundscapeTests)
     {
     public:
+        TEST_METHOD(SlotAndDrinkSoundsAreDistinctAndPauseFadesThem)
+        {
+            SoundscapeFrame frame; frame.active=true;
+            SoundscapeSynth base, slot, drink;
+            std::array<std::int16_t,8192> quiet{}, reels{}, glass{};
+            base.render(quiet.data(),quiet.size()/2,frame);
+            frame.slotEvent=1; frame.slotSpinning=true; frame.slotPan=1.f;
+            slot.render(reels.data(),reels.size()/2,frame);
+            frame.slotEvent=0; frame.slotSpinning=false; frame.drinkEvent=1;
+            drink.render(glass.data(),glass.size()/2,frame);
+            Assert::IsTrue(quiet!=reels && quiet!=glass && reels!=glass);
+            frame.active=false;
+            std::vector<std::int16_t> fade(88200);
+            slot.render(fade.data(),fade.size()/2,frame);
+            Assert::IsTrue(std::all_of(fade.end()-512,fade.end(),[](auto s){return s==0;}));
+        }
         TEST_METHOD(ChasingCreatureVocalizesEvenWhenNotStepping)
         {
             SoundscapeSynth calm, chasing;
@@ -49,6 +65,7 @@ namespace MazeUnitTest
         {
             SoundscapeFrame frame; frame.active = true; frame.moving = true;
             frame.running = true; frame.threat = .7f; frame.shifting = .4f; frame.thunderEvent = 1;
+            frame.slotEvent=2; frame.slotSpinning=true; frame.drinkEvent=1;
             SoundscapeSynth one, split;
             std::array<std::int16_t, 4096> full{}, parts{};
             one.render(full.data(), full.size() / 2, frame);

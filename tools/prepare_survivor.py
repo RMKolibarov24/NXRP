@@ -190,6 +190,31 @@ def main():
         for p, n in frames:
             p[:, 1] -= floor; p *= 1.18 / height
             out.write(np.concatenate((p, n), axis=1).astype('<f4').tobytes())
+    # Extract original skinned forearms/hands for the first-person view. Keep
+    # source triangles and UVs; this is mesh selection, never authored geometry.
+    for side in ('l', 'r'):
+        roots = [i for i,node in enumerate(model.nodes) if node.name == 'lowerarm_' + side]
+        descendants = set()
+        def include(index):
+            descendants.add(index)
+            for child in model.nodes[index].children or []: include(child)
+        for root in roots: include(root)
+        bone_ids = [i for i,node in enumerate(model.skins[0].joints) if node in descendants]
+        influence = np.sum(weights * np.isin(joints,bone_ids),axis=1)
+        selected = influence > .45
+        faces = triangles.reshape(-1,3)
+        faces = faces[np.all(selected[faces],axis=1)]
+        if len(faces) == 0: raise ValueError('No source hand geometry selected')
+        used, inverse = np.unique(faces.reshape(-1),return_inverse=True)
+        hand_p = frames[-1][0][used].copy()
+        hand_n = frames[-1][1][used].copy()
+        origin = hand_p.mean(axis=0)
+        hand_p -= origin
+        vertices = np.concatenate((hand_p,hand_n,uvs[used]),axis=1).astype('<f4')
+        with (args.output / ('hands-' + side + '.nxm')).open('wb') as out:
+            out.write(b'NXM1'+struct.pack('<II',len(vertices),len(inverse)))
+            out.write(vertices.tobytes()); out.write(inverse.astype('<u4').tobytes())
+        print(f'Extracted source hand {side}: {len(vertices)} vertices, bounds {hand_p.min(0)} to {hand_p.max(0)}')
     print(f'Prepared {len(positions):,} vertices, {len(triangles)//3:,} triangles and {len(frames)} animated frames')
 
 

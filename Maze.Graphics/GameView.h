@@ -18,6 +18,7 @@ struct GameInput
     float strafe = 0.f;
     float turn = 0.f;
     bool run = false;
+    bool crouch = false, jump = false;
 };
 
 struct RemotePlayer
@@ -25,6 +26,8 @@ struct RemotePlayer
     float x = .5f, z = .5f, angle = 0.f;
     bool moving = false, running = false, present = false;
     float elevation = 0.f;
+    float jumpHeight = 0.f;
+    bool crouched = false;
 };
 
 struct SafehouseDoor
@@ -100,6 +103,7 @@ private:
     bool nearInscription() const;
     void resetHunter(const GameState& game);
     void updateMonster(GameState& game, float seconds, bool playerMoving, bool playerRunning);
+    void updateInteriorHunter(float seconds);
     void updateShift(GameState& game, float seconds);
     void updateDoors(float seconds);
     void updateFear(GameState& game, float seconds);
@@ -130,6 +134,13 @@ private:
     sf::Vector2u postSize_{};
     unsigned int hedgeTexture_ = 0, groundTexture_ = 0, monsterTexture_ = 0, foliageTexture_ = 0;
     unsigned int shelterTexture_ = 0;
+    std::array<unsigned int, 4> refugePropMeshes_{};
+    std::array<std::array<unsigned int,4>,3> reelMeshes_{};
+    unsigned int slotsTexture_ = 0, barTexture_ = 0;
+    bool refugePropsAttempted_ = false;
+    std::array<unsigned int,2> handMeshes_{};
+    unsigned int handTexture_ = 0;
+    bool handsAttempted_ = false;
     unsigned int creatureMesh_ = 0, creatureTexture_ = 0;
     unsigned int survivorMesh_ = 0, survivorTexture_ = 0, survivorFrames_ = 0;
     float survivorDuration_ = 0.f;
@@ -143,6 +154,8 @@ private:
     bool clearChunks_ = true;
     float x_ = .5f, z_ = .5f, angle_ = 0.f, pitch_ = 0.f, elapsed_ = 0.f;
     float elevation_ = 0.f;
+    float jumpHeight_ = 0.f, jumpVelocity_ = 0.f, crouchBlend_ = 0.f;
+    bool crouched_ = false, jumpHeld_ = false;
     float inscriptionX_ = .10f, inscriptionZ_ = .75f;
     float ambientTime_ = 0.f, darkness_ = 0.f;
     float bobPhase_ = 0.f, bobBlend_ = 0.f, sprintBlend_ = 0.f;
@@ -169,7 +182,18 @@ private:
     int soundStatus_ = 0;
     float monsterClock_ = 0.f, monsterStepDuration_ = 1.15f, shiftClock_ = 0.f, messageClock_ = 0.f;
     float directorClock_ = 0.f;
+    float shiftDelay_ = 14.f;
+    std::vector<float> refugeNoise_;
+    float drinkClock_ = 0.f;
+    std::array<float, maxCoopPlayers> drinkCooldowns_{};
+    std::array<std::uint32_t, maxCoopPlayers> drinks_{};
+    std::uint32_t seenDrink_ = 0;
+    int interactionSlot_ = 0;
+    std::array<unsigned, 16> doorStrikes_{};
     std::uint32_t directorEvent_ = 0;
+    bool interiorHunter_ = false;
+    int interiorHouse_ = -1, interiorPhase_ = 0;
+    float hunterX_ = 0.f, hunterZ_ = 0.f, hunterY_ = 0.f;
     float monsterHeading_ = 0.f, monsterTargetHeading_ = 0.f, creatureGait_ = 0.f;
     enum class ShiftPhase { Idle, Opening, Open, Closing };
     ShiftPhase shiftPhase_ = ShiftPhase::Idle;

@@ -32,3 +32,12 @@ To regenerate the two files from the source GLB, install `numpy`, `Pillow`,
 `pygltflib` and `fast-simplification` in a separate Python environment, then
 run `python tools/prepare_survivor.py path/to/jog-maya-3d-person-animated.glb`.
 The converter is not needed to build or run the game.
+
+# First-person hands
+
+`hands-l.nxm` and `hands-r.nxm` are extracted from the same downloaded CC0
+Innerscene/MakeHuman Jog Maya source listed above, using its original hand and
+forearm triangles, UVs and `survivor.png` skin texture. No hand geometry is
+procedurally authored. The converter selects lowerarm/hand descendant bone
+weights, recentres the meshes, and runtime transforms animate camera sway,
+drinking and reaching for the slot handle. Regenerate with prepare_survivor.py.

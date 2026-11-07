@@ -5,19 +5,29 @@ A first-person maze game for Windows, built in C++17 with SFML and OpenGL. Explo
 ## Play
 
 - **W / S** move forward and back; **A / D** strafe.
-- **Mouse** or **Left / Right arrows** turn; **Shift** runs while breath lasts. Breath recovers when you stop running.
+- **Mouse** or **Left / Right arrows** turn; **Space** jumps and **Ctrl/C** crouches quietly; **Shift** runs while breath lasts. Breath recovers when you stop running.
 - **E** opens and closes nearby safehouse doors, reads the entrance inscription, and touches stones. Depending on the seed, touch the stones in the shown sequence or toggle stones whose numbers add up to the target. A wrong sequence resets its progress; in the balance puzzle `*` marks lit stones. Their numbers are recorded as you find them.
 - Each stone bears a number. At the gate, follow its inscription to transform the stone numbers into a code. Enter it with **1-9** (top row or numpad), then **Enter**; **Backspace** edits. Step through the gate when it opens. The creature patrols, watches ahead, follows what it sees or hears, and investigates your last known location. Running carries farther through the hedge, though several layers muffle the sound. If it catches you, you return to the entrance and keep your puzzle progress.
-- Enter a lit **safehouse** to set your personal checkpoint and recover breath faster. Each doorway has a door: press **E** to open it, step inside, and press **E** again to close it. The creature cannot cross the threshold, but it will circle an occupied refuge, rattle closed doors and slam an open one. **T** toggles the ray-traced lighting pass; **M** toggles sound; **B** toggles camera motion. **Escape** pauses; **R** restarts the current maze. Choose a size from 10 to 100 and an optional decimal seed in Settings; hold Shift while clicking +/- to adjust by ten. The default for new settings is 30×30; saved dimensions are respected. A blank seed produces a new random maze; the same size and seed reproduce the layout and puzzles with the same game version and toolchain.
+- Enter a lit **safehouse** to set your personal checkpoint and recover breath faster. Each doorway has a door: press **E** to open it, step inside, and press **E** again to close it. The creature can enter houses through their doorways. Closed doors buy time, but repeated strikes force them open. Loud activities attract it; repeated detections increase its hearing and search persistence. **T** toggles the ray-traced lighting pass; **M** toggles sound; **B** toggles camera motion. **Escape** pauses; **R** restarts the current maze. Choose a size from 10 to 100 and an optional decimal seed in Settings; hold Shift while clicking +/- to adjust by ten. The default for new settings is 30×30; saved dimensions are respected. A blank seed produces a new random maze; the same size and seed reproduce the layout and puzzles with the same game version and toolchain.
 
 Safehouses have two floors: walk up the east-side stairs to a small games court.
 **G** picks up or throws the basketball; **K** kicks the nearby football in the
 direction you face. Hoops and goals score for everyone in co-op. Downstairs,
-face the red slot-cabinet handle at close range and press **E** to pull it. Reels,
+face the slot-cabinet handle at close range and press **E** to pull it. Reels,
 handle animation and results are shared; three matching symbols win a free-play
 jackpot. **F** collects keeper field notes; **J** rereads them. Captures preserve
 notes; a restart resets notes, sports scores and machines. Small 10x10 mazes fit
 one larger refuge; larger maps have multiple houses.
+
+The upgraded slot cabinets, lever, bar and first-person hand/forearm meshes are
+adapted from downloaded models; author, source, license and conversion records
+are in [refuge asset credits](assets/models/REFUGE_SOURCES.md) and
+[character credits](assets/models/README.md). Hands follow camera movement and
+reach/drink interactions. The machine has mechanical reel sounds, a pull clank
+and result cues; the bar has a glass clink. **E** at the bar restores breath and
+reduces fear, but its noise can draw the hunter into the house. The creature can
+force doors and follow players upstairs. Maze openings and closures now use
+irregular seeded delays rather than a fixed interval. Co-op protocol is **9**.
 
 A packaged build includes assets and app-local Windows runtime libraries. Extract
 the entire ZIP and launch `Play.cmd`. See [the quick play guide](docs/PLAY.md).

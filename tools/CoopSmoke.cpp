@@ -135,10 +135,10 @@ int main()
     for (int i=0; i<3; ++i) assert(guests[i]->gameView_.gateOpen_);
 
     // A wall cannot close on any guest, including the third guest.
-    hv.updateShift(host.game_,24.f); hv.updateShift(host.game_,2.f);
+    hv.updateShift(host.game_,hv.shiftDelay_ + .01f); hv.updateShift(host.game_,2.f);
     assert(hv.shiftPhase_ == GameView::ShiftPhase::Open);
     third.gameView_.x_=hv.shift_.col+.5f; third.gameView_.z_=hv.shift_.row+.5f; third.game_.player=hv.shift_;
-    third.sendPlayer(); pump(40); hv.updateShift(host.game_,24.f);
+    third.sendPlayer(); pump(40); hv.updateShift(host.game_,hv.shiftDelay_ + .01f);
     assert(hv.shiftPhase_ == GameView::ShiftPhase::Open);
 
     // Visiting a refuge records a personal checkpoint and protects its occupant.
@@ -157,7 +157,8 @@ int main()
     assert(hv.checkpoints_[second.networkSlot_]==0 && second.gameView_.checkpoints_[second.networkSlot_]==0);
     hv.elapsed_=13.f; hv.monster_=hv.monsterFrom_=refuge; hv.monsterClock_=0.f;
     hv.updateMonster(host.game_,.001f,false,false); pump(20);
-    assert(second.gameView_.seenRemoteCaptures_==0);
+    assert(second.gameView_.seenRemoteCaptures_>0);
+    hv.remoteCaptureCooldown_[second.networkSlot_]=0.f;
 
     // Capture guest two outside the refuge without teleporting either other guest.
     const auto victim = hv.shrines_[hv.order_[1]];
@@ -245,6 +246,17 @@ int main()
     first.gameView_.elevation_ = refugeUpperFloor;
     hv.elapsed_ += 3.f; first.sendPlayer(); pump(20); sendKey(first, 'E');
     assert(hv.refugeSlots_[0].spins == 1);
+    // Bar drinks restore the guest who drank, never the host or another guest.
+    first.gameView_.x_=gamesHouse.col+.5f-.85f*refugeScale;
+    first.gameView_.z_=gamesHouse.row+.5f+.85f*refugeScale;
+    first.gameView_.elevation_=0.f; first.gameView_.stamina_=.2f;
+    hv.stamina_=.3f; first.sendPlayer(); pump(20); sendKey(first,'E');
+    assert(hv.drinks_[first.networkSlot_]==1 && first.gameView_.stamina_==1.f);
+    assert(hv.stamina_==.3f && hv.refugeNoise_[0]>0.f);
+    sendKey(first,'E'); assert(hv.drinks_[first.networkSlot_]==1);
+    second.gameView_.x_=first.gameView_.x_; second.gameView_.z_=first.gameView_.z_;
+    second.gameView_.elevation_=0.f; second.sendPlayer(); pump(20); sendKey(second,'E');
+    assert(hv.drinks_[second.networkSlot_]==1 && second.gameView_.stamina_==1.f);
     // Walk up the stair, onto the gallery, back to the stair and down again.
     hv.x_ = gamesHouse.col + .5f + .98f * refugeScale;
     hv.z_ = gamesHouse.row + .5f + .20f * refugeScale;
@@ -272,6 +284,60 @@ int main()
     hv.updateRefugeGames(1.2f); assert(basket.scoreA == beforeArc + 1);
     basket.carrier = first.networkSlot_; hv.remote_[first.networkSlot_].present = false;
     hv.updateRefugeGames(.01f); assert(basket.carrier == -1);
+    // Jump rises and lands; holding crouch prevents jumping and slows movement.
+    hv.jumpHeight_ = hv.jumpVelocity_ = 0.f; hv.jumpHeld_ = false;
+    GameInput leap; leap.jump = true;
+    hv.update(host.game_, .05f, leap); assert(hv.jumpHeight_ > .05f);
+    for (int i=0;i<25;++i) hv.update(host.game_, .05f, GameInput{});
+    assert(hv.jumpHeight_ == 0.f && hv.jumpVelocity_ == 0.f);
+    GameInput sneak; sneak.crouch = true; sneak.jump = true;
+    hv.update(host.game_, .05f, sneak);
+    assert(hv.crouched_ && hv.jumpHeight_ == 0.f && hv.crouchBlend_ > 0.f);
+    assert(hv.shiftDelay_ >= 8.f && hv.shiftDelay_ <= 35.f);
+    // Co-op stance is carried through actual TCP player and world messages.
+    first.gameView_.jumpHeight_=.25f; first.gameView_.crouched_=false;
+    first.sendPlayer(); pump(30);
+    assert(std::abs(hv.remote_[first.networkSlot_].jumpHeight-.25f)<.001f);
+    assert(std::abs(second.gameView_.remote_[first.networkSlot_].jumpHeight-.25f)<.001f);
+    first.gameView_.jumpHeight_=0.f; first.gameView_.crouched_=true;
+    first.sendPlayer(); pump(30);
+    assert(hv.remote_[first.networkSlot_].crouched && second.gameView_.remote_[first.networkSlot_].crouched);
+    first.gameView_.crouched_=false;
+    // The hunter follows the physical staircase up, then descends when abandoned.
+    hv.interiorHunter_=false; hv.hunterY_=0.f;
+    hv.monster_=hv.monsterFrom_=gamesHouse; hv.hunter_.cell=gamesHouse;
+    hv.hunter_.mode=HunterMode::Chase;
+    hv.x_=gamesHouse.col+.5f-.55f; hv.z_=gamesHouse.row+.5f-.5f;
+    hv.elevation_=refugeUpperFloor; hv.jumpHeight_=0.f;
+    for(int i=0;i<400 && hv.interiorPhase_!=4;++i) hv.updateInteriorHunter(.05f);
+    assert(hv.interiorHunter_ && hv.interiorPhase_==4 && hv.hunterY_==refugeUpperFloor);
+    for(int i=0;i<100;++i) hv.updateInteriorHunter(.05f);
+    assert(std::abs(hv.hunterX_-hv.x_)<.01f && std::abs(hv.hunterZ_-hv.z_)<.01f);
+    hv.elevation_=0.f;
+    for(auto& player:hv.remote_) player.present=false;
+    for(int i=0;i<400 && hv.interiorHunter_;++i) hv.updateInteriorHunter(.05f);
+    assert(!hv.interiorHunter_ && hv.hunterY_==0.f);
+    // Closed doors delay entry, then the hunter forces the actual doorway.
+    hv.x_=gamesHouse.col+.5f; hv.z_=gamesHouse.row+.5f; hv.elevation_=0.f;
+    host.game_.player=gamesHouse; hv.elapsed_=13.f;
+    hv.monster_=hv.monsterFrom_={gamesHouse.row,gamesHouse.col-3};
+    hv.hunter_.cell=hv.monster_; hv.hunter_.previous={gamesHouse.row,gamesHouse.col-4};
+    hv.hunter_.mode=HunterMode::Chase; hv.monsterClock_=0.f;
+    hv.doors_[0][0].open=false; hv.doors_[0][0].swing=0.f; hv.doorStrikes_.fill(0);
+    bool enteredHouse=false;
+    for(int i=0;i<8 && !enteredHouse;++i)
+    {
+        hv.updateMonster(host.game_,1.2f,false,false); hv.updateDoors(1.f);
+        enteredHouse=insideSafehouse(hv.monster_,gamesHouse);
+    }
+    assert(hv.doors_[0][0].open && enteredHouse);
+    // Upper-floor capture compares physical height, not footprint immunity.
+    hv.interiorHunter_=true; hv.interiorHouse_=0; hv.interiorPhase_=4;
+    hv.hunterX_=hv.x_; hv.hunterZ_=hv.z_; hv.hunterY_=refugeUpperFloor;
+    hv.elevation_=refugeUpperFloor; hv.elapsed_=13.f;
+    const auto beforeUpperCapture=hv.captureCount_;
+    hv.updateMonster(host.game_,.01f,false,false);
+    assert(hv.captureCount_==beforeUpperCapture+1);
     Multiplayer unavailable; unavailable.join("127.0.0.1", 1);
     for (int i=0; i<400 && unavailable.status()==Multiplayer::Status::Connecting; ++i)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -284,10 +350,29 @@ int main()
     hv.elevation_ = 0.f; hv.resize({640,560});
     sf::RenderTexture refugeTarget({640,560}, sf::ContextSettings{24});
     hv.draw(refugeTarget, host.game_); refugeTarget.display();
+    for (const auto mesh : hv.refugePropMeshes_) assert(mesh != 0);
+    assert(hv.slotsTexture_ != 0 && hv.barTexture_ != 0);
+    for (const auto& reel : hv.reelMeshes_) for (const auto mesh : reel) assert(mesh != 0);
+    assert(hv.handMeshes_[0] && hv.handMeshes_[1] && hv.handTexture_);
     assert(refugeTarget.getTexture().copyToImage().saveToFile("build/refuge-ground.png"));
     hv.elevation_ = refugeUpperFloor; hv.angle_ = 0.f; hv.pitch_ = -.12f;
     hv.draw(refugeTarget, host.game_); refugeTarget.display();
     assert(refugeTarget.getTexture().copyToImage().saveToFile("build/refuge-upper.png"));
+    hv.elevation_=0.f; hv.angle_=3.8f; hv.pitch_=0.f;
+    hv.refugeSlots_[0].stopTime=hv.elapsed_+1.6f;
+    hv.draw(refugeTarget,host.game_); refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/refuge-spinning.png"));
+    // Settled reel results must visibly change the downloaded model itself.
+    hv.refugeSlots_[0].stopTime=0.f; hv.refugeSlots_[0].symbols={0,0,0};
+    hv.draw(refugeTarget,host.game_); refugeTarget.display();
+    const auto reelA=refugeTarget.getTexture().copyToImage();
+    hv.refugeSlots_[0].symbols={3,3,3};
+    hv.draw(refugeTarget,host.game_); refugeTarget.display();
+    const auto reelB=refugeTarget.getTexture().copyToImage();
+    std::size_t changedReelPixels=0;
+    for(unsigned y=165;y<340;++y) for(unsigned x=170;x<420;++x)
+        if(reelA.getPixel({x,y})!=reelB.getPixel({x,y})) ++changedReelPixels;
+    assert(changedReelPixels>20);
     std::cout << "Screen-space ray tracing active: " << hv.rayTracingActive() << "\n";
     std::cout << "Four-player joins, capacity, both puzzles, refuges, captures, shifting, reconnect, and victory passed.\n";
 }

@@ -17,7 +17,8 @@ namespace
     }
     bool hunterOpen(const MazeGrid& maze, MazePosition p, const std::vector<MazePosition>& safehouses)
     {
-        return open(maze, p) && safehouseAt(p, safehouses) < 0;
+        (void)safehouses;
+        return open(maze, p);
     }
     constexpr MazePosition directions[] = { { -1,0 }, { 1,0 }, { 0,-1 }, { 0,1 } };
 
@@ -97,7 +98,7 @@ namespace
             for (const auto d : directions)
             {
                 const MazePosition next{ current.row + d.row, current.col + d.col };
-                if (!hunterOpen(maze, next, safehouses)) continue;
+                if (!hunterOpen(maze, next, safehouses) || !refugeEdgeAllowed(current, next, safehouses)) continue;
                 const int index = next.row * size.cols + next.col;
                 if (parent[index] >= 0) continue;
                 parent[index] = current.row * size.cols + current.col; pending.push(next);
@@ -152,10 +153,10 @@ void advanceHunterTargets(const MazeGrid& maze, HunterState& hunter, const Hunte
         if (!hunterOpen(maze, target.cell, safehouses)) continue;
         const int dr = hunter.cell.row - target.cell.row, dc = hunter.cell.col - target.cell.col;
         const int distance = dr * dr + dc * dc;
-        const bool seen = distance <= 64 && withinView(hunter, target.cell, distance)
+        const bool seen = target.noise == 0 && distance <= (target.crouched ? 16 : 64) && withinView(hunter, target.cell, distance)
             && visible(maze, hunter.cell, target.cell);
-        const int hearingBudget = target.running ? 6 : 2;
-        const bool heard = !seen && target.moving && distance <= hearingBudget * hearingBudget
+        const int hearingBudget = std::max(target.noise, target.running ? 6 : target.crouched ? 0 : 2) + static_cast<int>(hunter.vigilance / 3u);
+        const bool heard = !seen && (target.moving || target.noise > 0) && hearingBudget > 0 && distance <= hearingBudget * hearingBudget
             && soundReaches(maze, hunter.cell, target.cell, hearingBudget);
         const int signal = seen ? 2 : heard ? 1 : 0;
         if (signal > bestSignal || (signal > 0 && signal == bestSignal && distance < bestDistance))
@@ -164,7 +165,8 @@ void advanceHunterTargets(const MazeGrid& maze, HunterState& hunter, const Hunte
     if (bestSignal > 0)
     {
         hunter.lastKnown = sensed;
-        hunter.memory = 8;
+        hunter.vigilance = std::min(9u, hunter.vigilance + 1u);
+        hunter.memory = 8 + static_cast<int>(hunter.vigilance);
         // Noise attracts a search; only a sighting confirms a chase.
         hunter.mode = bestSignal == 2 ? HunterMode::Chase : HunterMode::Search;
     }
@@ -188,9 +190,9 @@ void advanceHunterTargets(const MazeGrid& maze, HunterState& hunter, const Hunte
         for (const auto d : directions)
         {
             const MazePosition p{ hunter.cell.row + d.row, hunter.cell.col + d.col };
-            if (hunterOpen(maze, p, safehouses) && !same(p, hunter.previous)) options[count++] = p;
+            if (hunterOpen(maze, p, safehouses) && refugeEdgeAllowed(hunter.cell, p, safehouses) && !same(p, hunter.previous)) options[count++] = p;
         }
-        if (count == 0 && hunterOpen(maze, hunter.previous, safehouses)) options[count++] = hunter.previous;
+        if (count == 0 && hunterOpen(maze, hunter.previous, safehouses) && refugeEdgeAllowed(hunter.cell, hunter.previous, safehouses)) options[count++] = hunter.previous;
         if (count > 0)
         {
             hunter.random ^= hunter.random << 13;

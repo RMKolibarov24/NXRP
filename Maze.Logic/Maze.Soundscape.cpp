@@ -32,6 +32,13 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
     }
     if (frame.active && frame.hunterChasing && !wasChasing_ && frame.threat > .05f) roar_ = 1.f;
     wasChasing_ = frame.active && frame.hunterChasing;
+    if (frame.slotEvent != slotEvent_)
+    { if (frame.active && frame.slotEvent) slotPull_=1.f; slotEvent_=frame.slotEvent; }
+    if (frame.drinkEvent != drinkEvent_)
+    { if (frame.active && frame.drinkEvent) { glass_=1.f; glassPhase_=0.f; } drinkEvent_=frame.drinkEvent; }
+    if (frame.active && wasSpinning_ && !frame.slotSpinning)
+    { slotResult_=1.f; slotResultTime_=0.f; slotWin_=frame.slotJackpot; }
+    wasSpinning_=frame.active && frame.slotSpinning;
     const float dt = 1.f / static_cast<float>(sampleRate_);
     const float threat = std::clamp(frame.threat, 0.f, 1.f);
     const float fear = std::clamp(frame.fear, 0.f, 1.f);
@@ -114,6 +121,21 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         const float creature = threat * (hunterStep * (.12f * std::sin(hunterPhase_ * 2.f * pi * 51.f)
             + .12f * rumble_) + .045f * rumble_ + voice);
         const float branches = shifting * .18f * rumble_;
+        slotPhase_ += dt; if (slotPhase_ > 10.f) slotPhase_ -= 10.f;
+        const float click=std::exp(-std::fmod(slotPhase_,1.f/14.f)*110.f);
+        const float motor=frame.slotSpinning ? .025f*std::sin(slotPhase_*2.f*pi*138.f)+click*.055f*noise : 0.f;
+        slotPull_*=std::exp(-dt/ .12f);
+        slotResultTime_+=dt; slotResult_*=std::exp(-dt/(slotWin_?1.5f:.25f));
+        const float resultTone=slotWin_ ?
+            std::sin(slotResultTime_*2.f*pi*523.25f)+.65f*std::sin(slotResultTime_*2.f*pi*659.25f)+.5f*std::sin(slotResultTime_*2.f*pi*783.99f)
+            : std::sin(slotResultTime_*2.f*pi*87.f);
+        const float machine=motor+slotPull_*.12f*(noise*.5f+std::sin(time_*2.f*pi*63.f))+
+            slotResult_*.055f*resultTone;
+        glassPhase_+=dt; glass_*=std::exp(-dt/.35f);
+        const float glass=glass_*.055f*(std::sin(glassPhase_*2.f*pi*1830.f)+.45f*std::sin(glassPhase_*2.f*pi*2917.f));
+        // Uneven subharmonics and a rasp keep the pursuer less human-sounding.
+        const float rasp=threat*.025f*breathEnvelope*(noise-breathNoise_)*roughness;
+        sample += glass;
         if (thunderDelay_ > 0.f)
         {
             thunderDelay_ -= dt;
@@ -123,9 +145,9 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         thunder_ *= std::exp(-dt / 1.8f);
         gain_ += .002f * ((frame.active ? 1.f : 0.f) - gain_);
         const float left = sample + creature * (1.f - hunterPan_) + branches * (1.f - shiftingPan_)
-            + door * (1.f - doorPan_) + whisper * (1.f - whisperPan_);
+            + door * (1.f - doorPan_) + whisper * (1.f - whisperPan_) + (creature*.12f+rasp)*(1.f-hunterPan_) + machine*(1.f-std::clamp(frame.slotPan,-1.f,1.f));
         const float right = sample + creature * (1.f + hunterPan_) + branches * (1.f + shiftingPan_)
-            + door * (1.f + doorPan_) + whisper * (1.f + whisperPan_);
+            + door * (1.f + doorPan_) + whisper * (1.f + whisperPan_) + (creature*.12f+rasp)*(1.f+hunterPan_) + machine*(1.f+std::clamp(frame.slotPan,-1.f,1.f));
         output[2 * i] = static_cast<std::int16_t>(std::clamp(left * gain_, -1.f, 1.f) * 32767.f);
         output[2 * i + 1] = static_cast<std::int16_t>(std::clamp(right * gain_, -1.f, 1.f) * 32767.f);
         time_ += dt;

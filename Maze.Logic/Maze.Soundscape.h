@@ -5,6 +5,9 @@
 
 struct SoundscapeFrame
 {
+    std::uint32_t slotEvent = 0, drinkEvent = 0;
+    bool slotSpinning = false, slotJackpot = false;
+    float slotPan = 0.f;
     bool active = false;
     bool moving = false;
     bool running = false;
@@ -45,4 +48,8 @@ private:
     float fear_ = 0.f, doorPhase_ = 0.f, doorAmp_ = 0.f, doorPan_ = 0.f;
     float whisperPhase_ = 0.f, whisperAmp_ = 0.f, whisperPan_ = 0.f, whisperNoise_ = 0.f;
     bool doorSlam_ = false, wasChasing_ = false;
+    std::uint32_t slotEvent_ = 0, drinkEvent_ = 0;
+    bool wasSpinning_ = false, slotWin_ = false;
+    float slotPhase_ = 0.f, slotPull_ = 0.f, slotResult_ = 0.f, slotResultTime_ = 0.f;
+    float glass_ = 0.f, glassPhase_ = 0.f;
 };

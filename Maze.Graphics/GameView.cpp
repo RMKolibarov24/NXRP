@@ -407,7 +407,8 @@ void GameView::resetFeedback() { }
 
 void GameView::initialize(GameState& game)
 {
-    x_ = z_ = .5f; elevation_ = 0.f;
+    interiorHunter_=false; interiorHouse_=-1; hunterY_=0.f;
+    x_ = z_ = .5f; elevation_ = 0.f; jumpHeight_ = jumpVelocity_ = crouchBlend_ = 0.f; crouched_ = jumpHeld_ = false;
     const bool south = open(game.maze, 1, 0);
     angle_ = south ? 0.f : pi / 2.f; pitch_ = 0.f;
     inscriptionX_ = south ? .10f : .75f;
@@ -421,8 +422,10 @@ void GameView::initialize(GameState& game)
     remoteCaptures_.fill(0); seenRemoteCaptures_ = 0; remoteCaptureCooldown_.fill(0.f);
     safehouses_ = generateSafehouses(game.maze.size(), game.mazeSeed.value_or(0));
     doors_.assign(safehouses_.size(), {});
+    refugeNoise_.assign(safehouses_.size(), 0.f); doorStrikes_.fill(0); drinkClock_ = 0.f; drinkCooldowns_.fill(0.f); drinks_.fill(0); seenDrink_=0; interactionSlot_=0;
     refugeBalls_.assign(safehouses_.size(), {});
     for (auto& balls : refugeBalls_) { balls[0].x = -.5f; balls[0].z = -.5f; balls[1].x = -.7f; balls[1].z = .5f; }
+    shiftDelay_ = 10.f + static_cast<float>(game.mazeSeed.value_or(0) % 21u);
     fieldNotes_ = 0; journalPage_ = -1; refugeSlots_.assign(safehouses_.size(), {});
     for (auto& house : doors_) for (auto& door : house)
     { door.open = false; door.swing = 0.f; door.rattle = 0.f; }
@@ -528,8 +531,7 @@ void GameView::handleEvent(const sf::Event& event, GameState& game)
         messageClock_ = 14.f;
         return;
     }
-    if (key->code == sf::Keyboard::Key::Space)
-    { if (!networkGuest_) pullSlotHandle(game); return; }
+
     if (key->code == sf::Keyboard::Key::E) { interact(game); return; }
     if (!nearGate(game) || solved_ != 3 || gateOpen_) return;
     int digit = 0;
@@ -597,10 +599,10 @@ void GameView::pullSlotHandle(const GameState& game)
     auto& machine = refugeSlots_[house];
     if (elapsed_ < machine.stopTime) return;
     machine.stopTime = elapsed_ + 2.f;
+    refugeNoise_[house] = 5.f;
     std::mt19937 random(game.mazeSeed.value_or(0) ^ (++machine.spins * 2654435761u) ^ (house * 0x85ebca6bu));
     for (auto& symbol : machine.symbols) symbol = random() % 4;
     notice_ = "The Lucky Lantern reels spin. Match three symbols!"; messageClock_ = 3.f;
-    ++doorEvent_; doorPan_ = 0.f; doorSlam_ = false;
 }
 
 int GameView::nearbyDoor() const
@@ -702,6 +704,24 @@ bool GameView::nearInscription() const
 void GameView::interact(GameState& game)
 {
     if (nearbySlotHandle() >= 0) { pullSlotHandle(game); return; }
+    if (elevation_ < .1f)
+    {
+        for (std::size_t house=0; house<safehouses_.size(); ++house)
+        {
+            const float dx=x_-(safehouses_[house].col+.5f-.85f*refugeScale);
+            const float dz=z_-(safehouses_[house].row+.5f+.85f*refugeScale);
+            if (dx*dx+dz*dz < .85f*.85f)
+            {
+                if (drinkCooldowns_[interactionSlot_] > 0.f) return;
+                drinkCooldowns_[interactionSlot_]=4.f; ++drinks_[interactionSlot_];
+                if (interactionSlot_ == networkSelfSlot_)
+                { drinkClock_=4.f; stamina_=1.f; fear_=std::max(0.f,fear_-.15f); }
+                refugeNoise_[house]=4.f;
+                notice_="You drink at the bar. A glass clinks. Something outside stops to listen.";
+                messageClock_=5.f; return;
+            }
+        }
+    }
     const int door = elevation_ < .1f ? nearbyDoor() : -1;
     if (door >= 0)
     {
@@ -736,13 +756,14 @@ void GameView::interact(GameState& game)
 
 void GameView::resetHunter(const GameState& game)
 {
+    interiorHunter_=false; interiorHouse_=-1; hunterY_=0.f;
     hunter_ = makeHunter(game.maze, game.mazeSeed.value_or(0), captureCount_, shrines_, shift_, safehouses_);
     monster_ = hunter_.cell; monsterFrom_ = monster_;
 }
 
 RemotePlayer GameView::localPlayer() const noexcept
 {
-    return { x_, z_, angle_, soundMoving_, soundRunning_, initialized_, elevation_ };
+    return { x_, z_, angle_, soundMoving_ || (crouched_ && bobBlend_ > .1f), soundRunning_, initialized_, elevation_, jumpHeight_, crouched_ };
 }
 
 void GameView::setRemotePlayer(int slot, const RemotePlayer& player) noexcept
@@ -784,12 +805,12 @@ std::string GameView::worldSnapshot() const
     for (unsigned i = 0; i < discoveredClues_.size(); ++i) if (discoveredClues_[i]) clues |= 1u << i;
     std::ostringstream out;
     out.precision(8);
-    out << x_ << ' ' << z_ << ' ' << angle_ << ' ' << soundMoving_ << ' ' << soundRunning_ << ' ' << elevation_;
+    out << x_ << ' ' << z_ << ' ' << angle_ << ' ' << soundMoving_ << ' ' << soundRunning_ << ' ' << elevation_ << ' ' << jumpHeight_ << ' ' << crouched_;
     for (int slot = 1; slot < maxCoopPlayers; ++slot)
     {
         const auto& player = remote_[slot];
         out << ' ' << player.present << ' ' << player.x << ' ' << player.z << ' ' << player.angle
-            << ' ' << player.moving << ' ' << player.running << ' ' << player.elevation;
+            << ' ' << player.moving << ' ' << player.running << ' ' << player.elevation << ' ' << player.jumpHeight << ' ' << player.crouched;
     }
     out << ' '
         << monsterFrom_.row << ' ' << monsterFrom_.col << ' ' << monster_.row << ' ' << monster_.col << ' '
@@ -805,6 +826,8 @@ std::string GameView::worldSnapshot() const
         out << ' ' << b.x << ' ' << b.y << ' ' << b.z << ' ' << b.vx << ' ' << b.vy << ' ' << b.vz << ' ' << b.carrier << ' ' << b.scoreA << ' ' << b.scoreB;
     for (const auto& machine : refugeSlots_)
         out << ' ' << machine.spins << ' ' << machine.stopTime << ' ' << machine.symbols[0] << ' ' << machine.symbols[1] << ' ' << machine.symbols[2];
+    for (const auto count : drinks_) out << ' ' << count;
+    out << ' ' << interiorHunter_ << ' ' << hunterX_ << ' ' << hunterY_ << ' ' << hunterZ_;
     return out.str();
 }
 
@@ -813,7 +836,7 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     if (!initialized_ || game.maze.empty() || selfSlot < 1 || selfSlot >= maxCoopPlayers) return false;
     std::istringstream in(data);
     std::array<RemotePlayer, maxCoopPlayers> players{};
-    std::array<int, maxCoopPlayers> presence{}, moving{}, running{};
+    std::array<int, maxCoopPlayers> presence{}, moving{}, running{}, crouching{};
     std::array<std::uint32_t, maxCoopPlayers> captures{};
     std::array<int, maxCoopPlayers> checkpoints{};
     MazePosition from{}, monster{}, shift{};
@@ -822,9 +845,9 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     unsigned clues, activeStones, doorsMask;
     std::string input, extra;
     presence[0] = 1;
-    if (!(in >> players[0].x >> players[0].z >> players[0].angle >> moving[0] >> running[0] >> players[0].elevation)) return false;
+    if (!(in >> players[0].x >> players[0].z >> players[0].angle >> moving[0] >> running[0] >> players[0].elevation >> players[0].jumpHeight >> crouching[0])) return false;
     for (int slot = 1; slot < maxCoopPlayers; ++slot)
-        if (!(in >> presence[slot] >> players[slot].x >> players[slot].z >> players[slot].angle >> moving[slot] >> running[slot] >> players[slot].elevation)) return false;
+        if (!(in >> presence[slot] >> players[slot].x >> players[slot].z >> players[slot].angle >> moving[slot] >> running[slot] >> players[slot].elevation >> players[slot].jumpHeight >> crouching[slot])) return false;
     if (!(in >> from.row >> from.col >> monster.row >> monster.col >> clock >> duration >> heading >> gait
         >> elapsed >> ambient >> hunterMode >> phase >> shift.row >> shift.col >> progress >> solved >> activeStones >> inscription >> gate
         >> input >> clues)) return false;
@@ -847,6 +870,12 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
         if (!std::isfinite(machine.stopTime) || machine.stopTime < 0.f) return false;
         for (const int symbol : machine.symbols) if (symbol < 0 || symbol > 3) return false;
     }
+    std::array<std::uint32_t,maxCoopPlayers> drinks{};
+    for (auto& count : drinks) if (!(in >> count)) return false;
+    int interior; float hx,hy,hz;
+    if (!(in >> interior >> hx >> hy >> hz) || (interior!=0 && interior!=1) ||
+        !std::isfinite(hx) || !std::isfinite(hy) || !std::isfinite(hz) || hy<0.f || hy>refugeUpperFloor ||
+        (interior && (hx<0.f || hz<0.f || hx>=game.maze.size().cols || hz>=game.maze.size().rows))) return false;
     if (in >> extra) return false;
     const unsigned int doorLimit = doors_.size() < 8
         ? (1u << (doors_.size() * 4)) : 0xffffffffu;
@@ -857,7 +886,7 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     for (int slot = 0; slot < maxCoopPlayers; ++slot)
     {
         const auto& player = players[slot];
-        if (!finite(player.elevation) || player.elevation < 0.f || player.elevation > refugeUpperFloor || !finite(player.x) || !finite(player.z) || !finite(player.angle) || player.x < 0 || player.z < 0 ||
+        if (!finite(player.jumpHeight) || player.jumpHeight < 0.f || player.jumpHeight > .6f || (crouching[slot]!=0 && crouching[slot]!=1) || !finite(player.elevation) || player.elevation < 0.f || player.elevation > refugeUpperFloor || !finite(player.x) || !finite(player.z) || !finite(player.angle) || player.x < 0 || player.z < 0 ||
             player.x >= size.cols || player.z >= size.rows || (presence[slot] != 0 && presence[slot] != 1) ||
             (moving[slot] != 0 && moving[slot] != 1) || (running[slot] != 0 && running[slot] != 1) ||
             checkpoints[slot] < -1 || checkpoints[slot] >= static_cast<int>(safehouses_.size())) return false;
@@ -884,7 +913,7 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     for (int slot = 0; slot < maxCoopPlayers; ++slot)
     {
         if (slot == selfSlot || !presence[slot]) { remoteDisconnected(slot); continue; }
-        players[slot].moving = moving[slot] != 0; players[slot].running = running[slot] != 0; players[slot].present = true;
+        players[slot].moving = moving[slot] != 0; players[slot].running = running[slot] != 0; players[slot].present = true; players[slot].crouched=crouching[slot]!=0;
         setRemotePlayer(slot, players[slot]);
     }
     checkpoints_ = checkpoints; networkSelfSlot_ = selfSlot;
@@ -903,9 +932,14 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
                 ? std::clamp((-dx * std::cos(angle_) + dz * std::sin(angle_)) / distance, -1.f, 1.f) : 0.f;
         }
     refugeBalls_ = std::move(balls);
-    for (std::size_t house = 0; house < machines.size(); ++house)
-        if (machines[house].spins != refugeSlots_[house].spins) { ++doorEvent_; doorSlam_ = false; doorPan_ = 0.f; }
     refugeSlots_ = std::move(machines);
+    interiorHunter_=interior!=0; hunterX_=hx; hunterY_=hy; hunterZ_=hz;
+    drinks_=drinks;
+    if (drinks_[selfSlot] != seenDrink_)
+    {
+        seenDrink_=drinks_[selfSlot]; stamina_=1.f; fear_=std::max(0.f,fear_-.15f); drinkClock_=4.f;
+        notice_="You drink. The glass clinks; the hunter can hear it."; messageClock_=5.f;
+    }
     monsterFrom_ = from; monster_ = monster; monsterClock_ = clock; monsterStepDuration_ = duration;
     monsterHeading_ = heading; creatureGait_ = gait; elapsed_ = elapsed; ambientTime_ = ambient;
     hunter_.mode = static_cast<HunterMode>(hunterMode);
@@ -932,6 +966,8 @@ void GameView::handleRemoteEvent(int slot, const sf::Event& event, GameState& ga
     const auto* ballKey = event.getIf<sf::Event::KeyPressed>();
     if (ballKey && (ballKey->code == sf::Keyboard::Key::G || ballKey->code == sf::Keyboard::Key::K))
     { playRefugeBall(ballKey->code == sf::Keyboard::Key::G, slot); return; }
+    interactionSlot_=slot;
+    const float savedStamina=stamina_, savedFear=fear_;
     const float savedElevation = elevation_;
     elevation_ = remote_[slot].elevation;
     const float savedX = x_, savedZ = z_, savedAngle = angle_;
@@ -939,14 +975,68 @@ void GameView::handleRemoteEvent(int slot, const sf::Event& event, GameState& ga
     const int stone = nearbyShrine();
     if (stone >= 0) discoveredClues_[stone] = true;
     handleEvent(event, game);
-    x_ = savedX; z_ = savedZ; angle_ = savedAngle; elevation_ = savedElevation;
+    x_ = savedX; z_ = savedZ; angle_ = savedAngle; elevation_ = savedElevation; stamina_=savedStamina; fear_=savedFear; interactionSlot_=networkSelfSlot_;
+}
+
+void GameView::updateInteriorHunter(float seconds)
+{
+    const int house=interiorHunter_?interiorHouse_:safehouseAt(monster_,safehouses_);
+    if (house<0) return;
+    const auto centre=safehouses_[house];
+    RemotePlayer target; float nearest=1e9f;
+    for (int slot=0;slot<maxCoopPlayers;++slot)
+    {
+        const auto player=slot==networkSelfSlot_?localPlayer():remote_[slot];
+        if (!player.present || player.elevation<1.5f || safehouseAt({static_cast<int>(player.z),static_cast<int>(player.x)},safehouses_)!=house) continue;
+        const float distance=(player.x-(centre.col+.5f))*(player.x-(centre.col+.5f))+(player.z-(centre.row+.5f))*(player.z-(centre.row+.5f));
+        if (distance<nearest) { target=player; nearest=distance; }
+    }
+    if (!interiorHunter_)
+    {
+        if (!target.present || hunter_.mode==HunterMode::Patrol) return;
+        const float blend=std::clamp(monsterClock_/monsterStepDuration_,0.f,1.f);
+        hunterX_=monsterFrom_.col+.5f+(monster_.col-monsterFrom_.col)*blend;
+        hunterZ_=monsterFrom_.row+.5f+(monster_.row-monsterFrom_.row)*blend;
+        // Finish crossing the doorway before changing to the stair route.
+        if (safehouseAt({static_cast<int>(hunterZ_),static_cast<int>(hunterX_)},safehouses_)!=house) return;
+        interiorHunter_=true; interiorHouse_=house; interiorPhase_=0; hunterY_=0.f;
+    }
+    if (!target.present && interiorPhase_<2) { interiorHunter_=false; hunterY_=0.f; return; }
+    if (!target.present && interiorPhase_==4) interiorPhase_=5;
+    const float hx=centre.col+.5f,hz=centre.row+.5f;
+    float gx=hunterX_,gz=hunterZ_;
+    switch(interiorPhase_)
+    {
+    case 0: gz=hz+.20f*refugeScale; break;
+    case 1: gx=hx+.98f*refugeScale; gz=hz+.20f*refugeScale; break;
+    case 2: gx=hx+.98f*refugeScale; gz=hz+1.16f*refugeScale; break;
+    case 3: case 5: gx=hx+.45f*refugeScale; gz=hz+1.16f*refugeScale; break;
+    case 4: gx=std::min(target.x,hx+.60f*refugeScale); gz=target.z; break;
+    case 6: gx=hx+.98f*refugeScale; gz=hz+1.16f*refugeScale; break;
+    case 7: gx=hx+.98f*refugeScale; gz=hz+.20f*refugeScale; break;
+    }
+    const float dx=gx-hunterX_,dz=gz-hunterZ_,distance=std::sqrt(dx*dx+dz*dz);
+    const float step=std::min(distance,seconds*.95f);
+    if(distance>.001f)
+    {
+        hunterX_+=dx/distance*step; hunterZ_+=dz/distance*step;
+        monsterTargetHeading_=std::atan2(dx,dz); creatureGait_+=seconds*7.f;
+    }
+    hunterY_=refugeFloorHeight(hunterX_,hunterZ_,hunterY_,safehouses_);
+    hunter_.cell=monster_=monsterFrom_={static_cast<int>(hunterZ_),static_cast<int>(hunterX_)};
+    hunter_.mode=target.present?HunterMode::Chase:HunterMode::Search;
+    if (distance<=step+.001f && interiorPhase_!=4)
+    {
+        if(interiorPhase_==7) {interiorHunter_=false; interiorHouse_=-1; hunterY_=0.f;}
+        else ++interiorPhase_;
+    }
 }
 
 void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, bool playerRunning)
 {
     if (elapsed_ < 12.f) { monsterClock_ = 0.f; movementHeard_ = runningHeard_ = false; return; }
     directorClock_ += seconds;
-    if (directorClock_ >= 55.f)
+    if (!interiorHunter_ && directorClock_ >= 55.f)
     {
         directorClock_ = 0.f;
         std::array<HunterTarget, maxCoopPlayers> group{};
@@ -965,21 +1055,41 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
     movementHeard_ = movementHeard_ || playerMoving;
     runningHeard_ = runningHeard_ || playerRunning;
     monsterClock_ += seconds;
-    if (monsterClock_ >= monsterStepDuration_)
+    if (!interiorHunter_ && monsterClock_ >= monsterStepDuration_)
     {
         monsterClock_ -= monsterStepDuration_;
         monsterFrom_ = monster_;
         const auto previousMode = hunter_.mode;
-        std::array<HunterTarget, maxCoopPlayers> targets{};
+        std::array<HunterTarget, maxCoopPlayers + 4> targets{};
         std::size_t count = 0;
-        targets[count++] = { game.player, movementHeard_, runningHeard_ };
+        targets[count++] = { game.player, movementHeard_ && !crouched_, runningHeard_, jumpHeight_>.01f?4:0, crouched_ };
         for (int slot = 1; slot < maxCoopPlayers; ++slot)
         {
             const auto& player = remote_[slot];
             if (player.present) targets[count++] = { { static_cast<int>(player.z), static_cast<int>(player.x) },
-                player.moving, player.running };
+                player.moving, player.running, player.jumpHeight>.01f?4:0, player.crouched };
         }
+        for (std::size_t house=0;house<refugeNoise_.size();++house)
+            if (refugeNoise_[house]>0.f) targets[count++]={safehouses_[house],true,true,10,false};
         advanceHunterGroup(game.maze, hunter_, targets.data(), count, safehouses_);
+        // A closed doorway delays entry. Repeated strikes force it open;
+        // the route planner never cuts through the cabin walls.
+        for (std::size_t house=0;house<safehouses_.size();++house)
+        {
+            const auto centre=safehouses_[house];
+            if (insideSafehouse(monsterFrom_,centre)==insideSafehouse(hunter_.cell,centre)) continue;
+            const auto outside=insideSafehouse(monsterFrom_,centre)?hunter_.cell:monsterFrom_;
+            const int side=outside.col<centre.col-2?0:outside.col>centre.col+2?1:outside.row<centre.row-2?2:3;
+            auto& door=doors_[house][side];
+            if (door.swing < .85f)
+            {
+                const auto index=house*4+side;
+                if (++doorStrikes_[index]>=3u) { if (!door.open) toggleDoor(static_cast<int>(house),side); doorStrikes_[index]=0; }
+                door.rattle=1.f; ++doorEvent_; doorSlam_=true;
+                hunter_.cell=monsterFrom_; hunter_.previous=monsterFrom_;
+                notice_="It is forcing the door. Find another way out."; messageClock_=3.f;
+            }
+        }
         movementHeard_ = runningHeard_ = false;
         monster_ = hunter_.cell;
         if (!same(monster_, monsterFrom_))
@@ -991,19 +1101,20 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
             notice_ = "It has found you."; messageClock_ = 3.f;
         }
     }
+    updateInteriorHunter(seconds);
     const float turn = std::remainder(monsterTargetHeading_ - monsterHeading_, 2.f * pi);
     monsterHeading_ += std::clamp(turn, -seconds * 4.f, seconds * 4.f);
     if (!same(monster_, monsterFrom_)) creatureGait_ += seconds * (hunter_.mode == HunterMode::Chase ? 9.f : 6.f);
     const float blend = std::clamp(monsterClock_ / monsterStepDuration_, 0.f, 1.f);
-    const float mx = monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
-    const float mz = monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
+    const float mx = interiorHunter_ ? hunterX_ : monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
+    const float mz = interiorHunter_ ? hunterZ_ : monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
     const float dx = x_ - mx, dz = z_ - mz;
     for (int slot = 1; slot < maxCoopPlayers; ++slot)
     {
         auto& player = remote_[slot];
         const float remoteDx = player.x - mx, remoteDz = player.z - mz;
         const MazePosition playerCell{ static_cast<int>(player.z), static_cast<int>(player.x) };
-        if (player.present && safehouseAt(playerCell, safehouses_) < 0 && remoteCaptureCooldown_[slot] <= 0.f &&
+        if (player.present && std::abs(player.elevation + player.jumpHeight - hunterY_) < .65f && remoteCaptureCooldown_[slot] <= 0.f &&
             remoteDx * remoteDx + remoteDz * remoteDz < .38f * .38f)
         {
             ++remoteCaptures_[slot];
@@ -1013,7 +1124,7 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
             notice_ = "A companion was caught."; messageClock_ = 4.f;
         }
     }
-    if (safehouseAt(game.player, safehouses_) < 0 && dx * dx + dz * dz < .38f * .38f)
+    if (std::abs(elevation_ + jumpHeight_ - hunterY_) < .65f && dx * dx + dz * dz < .38f * .38f)
     {
         const int house = checkpoints_[0];
         const MazePosition respawn = house >= 0 ? safehouses_[house] : MazePosition{ 0, 0 };
@@ -1029,7 +1140,7 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
         messageClock_ = 5.f;
     }
     // The creature remembers occupied refuges. It circles them, tests closed
-    // doors and slams an open one shut, but it can never cross the threshold.
+    // doors and slams an open one shut. Doorway routing and strikes allow entry.
     if (elapsed_ >= 12.f && messageClock_ <= 0.f)
     {
         rattleClock_ += seconds;
@@ -1062,7 +1173,7 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
                     const float distance = std::sqrt(doorDx * doorDx + doorDz * doorDz);
                     doorPan_ = distance > .001f
                         ? std::clamp((-doorDx * std::cos(angle_) + doorDz * std::sin(angle_)) / distance, -1.f, 1.f) : 0.f;
-                    notice_ = "Something tests the safehouse door. It cannot get in.";
+                    notice_ = "Something tests the safehouse door. The door will not hold forever.";
                     messageClock_ = 4.f;
                 }
                 fear_ = std::min(1.f, fear_ + .18f);
@@ -1088,6 +1199,8 @@ void GameView::update(GameState& game, float seconds)
         - (down(sf::Keyboard::Key::S) || down(sf::Keyboard::Key::Down) ? 1.f : 0.f);
     input.strafe = (down(sf::Keyboard::Key::D) ? 1.f : 0.f) - (down(sf::Keyboard::Key::A) ? 1.f : 0.f);
     input.run = down(sf::Keyboard::Key::LShift);
+    input.crouch = down(sf::Keyboard::Key::LControl) || down(sf::Keyboard::Key::C);
+    input.jump = down(sf::Keyboard::Key::Space);
     update(game, seconds, input);
 }
 
@@ -1104,9 +1217,13 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
         visual.x += (player.x - visual.x) * blend;
         visual.z += (player.z - visual.z) * blend;
         visual.elevation += (player.elevation - visual.elevation) * blend;
+        visual.jumpHeight += (player.jumpHeight-visual.jumpHeight)*blend; visual.crouched=player.crouched;
         visual.angle += std::remainder(player.angle - visual.angle, 2.f * pi) * blend;
         visual.moving = player.moving; visual.running = player.running;
     }
+    drinkClock_ = std::max(0.f, drinkClock_ - seconds);
+    for (auto& cooldown : drinkCooldowns_) cooldown=std::max(0.f,cooldown-seconds);
+    for (auto& noise : refugeNoise_) noise=std::max(0.f,noise-seconds);
     elapsed_ += seconds; messageClock_ = std::max(0.f, messageClock_ - seconds);
     const auto previousStorm = sampleStorm(ambientTime_, game.mazeSeed.value_or(0)).event;
     ambientTime_ += seconds;
@@ -1116,11 +1233,22 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
     const float forward = std::clamp(input.forward, -1.f, 1.f);
     const float strafe = std::clamp(input.strafe, -1.f, 1.f);
     const float length = std::sqrt(forward * forward + strafe * strafe);
-    const bool running = length > 0.f && input.run && !exhausted_;
+    crouched_ = input.crouch && jumpHeight_ <= .001f;
+    crouchBlend_ += ((crouched_ ? 1.f : 0.f) - crouchBlend_) * std::min(1.f, seconds * 12.f);
+    if (input.jump && !jumpHeld_ && !crouched_ && jumpHeight_ <= .001f && stamina_ > .08f)
+    { jumpVelocity_ = 2.6f; stamina_ = std::max(0.f, stamina_ - .08f); }
+    jumpHeld_ = input.jump;
+    if (jumpVelocity_ != 0.f || jumpHeight_ > 0.f)
+    {
+        jumpVelocity_ -= 8.f * seconds;
+        jumpHeight_ = std::max(0.f, jumpHeight_ + jumpVelocity_ * seconds);
+        if (jumpHeight_ <= 0.f) { jumpVelocity_ = 0.f; }
+    }
+    const bool running = length > 0.f && input.run && !exhausted_ && !crouched_;
     const float oldX = x_, oldZ = z_;
     if (length > 0.f)
     {
-        const float speed = (running ? 2.15f : 1.45f) * seconds / length;
+        const float speed = (crouched_ ? .65f : running ? 2.15f : 1.45f) * seconds / length;
         const float dx = (std::sin(angle_) * forward - std::cos(angle_) * strafe) * speed;
         const float dz = (std::cos(angle_) * forward + std::sin(angle_) * strafe) * speed;
         if (walkable(game, x_ + dx, z_)) x_ += dx;
@@ -1139,7 +1267,7 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
     if (currentHouse >= 0 && checkpoints_[networkSelfSlot_] != currentHouse)
     {
         checkpoints_[networkSelfSlot_] = currentHouse;
-        notice_ = "Safehouse found. The creature cannot enter."; messageClock_ = 5.f;
+        notice_ = "Refuge checkpoint set. Doors buy time, but the hunter can enter."; messageClock_ = 5.f;
     }
     // A nearby stone displays its engraving, so record it for the gate puzzle.
     // The journal survives a capture but is cleared when the maze is restarted.
@@ -1162,7 +1290,7 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
     if (moved) bobPhase_ += seconds * (running ? 10.f : 7.f);
     const float targetDarkness = hedgeDarkness(x_, z_, game.mazeSeed.value_or(0));
     darkness_ += (targetDarkness - darkness_) * std::min(1.f, seconds * 1.5f);
-    soundMoving_ = moved; soundRunning_ = running && moved;
+    soundMoving_ = moved && !crouched_; soundRunning_ = running && moved;
     if (networkGuest_)
     {
         monsterClock_ = std::min(monsterClock_ + seconds, monsterStepDuration_);
@@ -1259,8 +1387,8 @@ void GameView::updateFear(GameState& game, float seconds)
     if (elapsed_ >= 12.f)
     {
         const float blend = std::clamp(monsterClock_ / monsterStepDuration_, 0.f, 1.f);
-        const float mx = monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
-        const float mz = monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
+        const float mx = interiorHunter_ ? hunterX_ : monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
+        const float mz = interiorHunter_ ? hunterZ_ : monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
         const float dx = x_ - mx, dz = z_ - mz;
         threat = std::clamp(1.f - std::sqrt(dx * dx + dz * dz) / 11.f, 0.f, 1.f);
     }
@@ -1301,18 +1429,20 @@ void GameView::updateShift(GameState& game, float seconds)
         {
             game.maze.at(shift_.row, shift_.col) = MazeCell::Passage;
             shiftPhase_ = ShiftPhase::Open; shiftClock_ = 0.f;
+            shiftDelay_ = 8.f + static_cast<float>((game.mazeSeed.value_or(0) ^ (shiftCount_ * 2246822519u)) % 21u);
             invalidateChunksAround(shift_);
         }
         else
         {
             const auto finished = shift_;
             shift_ = { -1, -1 }; shiftPhase_ = ShiftPhase::Idle; shiftClock_ = 0.f;
+            shiftDelay_ = 10.f + static_cast<float>((game.mazeSeed.value_or(0) ^ (shiftCount_ * 3266489917u)) % 26u);
             invalidateChunksAround(finished);
         }
         return;
     }
     shiftClock_ += seconds;
-    if (shiftClock_ < 24.f) return;
+    if (shiftClock_ < shiftDelay_) return;
     if (shiftPhase_ == ShiftPhase::Open)
     {
         const bool playerOverlaps = x_ + .17f > shift_.col && x_ - .17f < shift_.col + 1.f
@@ -1592,14 +1722,33 @@ SoundscapeFrame GameView::soundFrame() const
     SoundscapeFrame frame;
     frame.active = initialized_; frame.moving = soundMoving_; frame.running = soundRunning_;
     frame.thunderEvent = thunderEvent_;
+    float nearestSlot=64.f;
+    for (std::size_t house=0;house<safehouses_.size();++house)
+    {
+        const float dx=safehouses_[house].col+.5f-.85f*refugeScale-x_;
+        const float dz=safehouses_[house].row+.5f-.85f*refugeScale-z_;
+        const float distance=dx*dx+dz*dz;
+        if (distance>=nearestSlot) continue;
+        nearestSlot=distance;
+        const auto& machine=refugeSlots_[house];
+        frame.slotEvent=machine.spins;
+        frame.slotSpinning=elapsed_<machine.stopTime;
+        frame.slotJackpot=machine.spins && machine.symbols[0]==machine.symbols[1] && machine.symbols[1]==machine.symbols[2];
+        frame.slotPan=distance>.001f?std::clamp((-dx*std::cos(angle_)+dz*std::sin(angle_))/std::sqrt(distance),-1.f,1.f):0.f;
+    }
+    for (int slot=0;slot<maxCoopPlayers;++slot)
+    {
+        const auto player=slot==networkSelfSlot_?localPlayer():remote_[slot];
+        if (player.present && (player.x-x_)*(player.x-x_)+(player.z-z_)*(player.z-z_)<64.f) frame.drinkEvent+=drinks_[slot];
+    }
     frame.fear = fear_;
     frame.doorEvent = doorEvent_; frame.doorPan = doorPan_; frame.doorSlam = doorSlam_;
     frame.whisperEvent = whisperEvent_; frame.whisperPan = whisperPan_;
     if (elapsed_ >= 12.f)
     {
         const float blend = std::clamp(monsterClock_ / monsterStepDuration_, 0.f, 1.f);
-        const float mx = monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
-        const float mz = monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
+        const float mx = interiorHunter_ ? hunterX_ : monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
+        const float mz = interiorHunter_ ? hunterZ_ : monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
         const float dx = mx - x_, dz = mz - z_;
         const float distance = std::sqrt(dx*dx + dz*dz);
         frame.threat = std::clamp(1.f - distance / 11.f, 0.f, 1.f);
@@ -1857,7 +2006,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
     const float fearSway = fear_ * (.0035f * std::sin(ambientTime_ * 1.7f)
         + .0018f * std::sin(ambientTime_ * 4.3f + 1.1f));
-    const float eyeHeight = elevation_ + .72f + .009f * bobBlend_ * std::sin(bobPhase_ * 2.f) + fearSway;
+    const float eyeHeight = elevation_ + jumpHeight_ - crouchBlend_ * .30f + .72f + .009f * bobBlend_ * std::sin(bobPhase_ * 2.f) + fearSway;
     const float roll = .35f * bobBlend_ * std::sin(bobPhase_)
         + fear_ * 1.15f * std::sin(ambientTime_ * 1.13f + .7f);
     const double nearPlane = .05, top = nearPlane * .65 * (1.0 + .035 * sprintBlend_);
@@ -2025,32 +2174,42 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, dark);
         // Colourful refuge furniture stays clear of the four doorways.
         glColor3f(.48f, .12f, .29f); part(hx, .018f, hz, 1.65f, .025f, 1.65f);
-        glColor3f(.05f, .45f, .40f); part(hx - .85f, 0.f, hz + .85f, .45f, .72f, .36f);
-        glColor3f(.85f, .52f, .12f); part(hx - .85f, .70f, hz + .85f, .48f, .06f, .40f);
-        glColor3f(.80f, .76f, .54f); part(hx - .85f, .77f, hz + .85f, .27f, .018f, .20f);
-        glColor3f(.33f, .12f, .54f); part(hx - .85f, 0.f, hz - .85f, .46f, 1.05f, .40f);
-        const GLfloat arcadeGlow[] = { .16f, .50f, .42f, 1.f };
-        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, arcadeGlow);
-        for (int reel = 0; reel < 3; ++reel)
+        if (!refugePropsAttempted_)
         {
-            const auto& machine = refugeSlots_[safehouseAt(house, safehouses_)];
-            const float spin = std::max(0.f, machine.stopTime - elapsed_ - (2 - reel) * .25f);
-            const float pulse = spin > 0.f ? .5f + .5f * std::sin(elapsed_ * 24.f + reel * 2.f) : 1.f;
-            glColor3f(.95f, .35f + .30f * pulse, .15f + .45f * (1.f - pulse));
-            part(hx - 1.f + reel * .14f, .70f, hz - .635f, .12f, .20f, .025f);
-            glDisable(GL_LIGHTING); glColor3f(.08f, .10f, .15f);
-            glPushMatrix(); glTranslatef(hx - 1.f + reel * .14f, .80f, hz - .618f);
-            glScalef(.36f, .36f, .36f);
-            const int symbol = spin > 0.f ? (static_cast<int>(elapsed_ * 15.f) + reel) % 4 : machine.symbols[reel];
-            shrineGlyph(symbol % 3, symbol == 3 ? 7 : 0);
-            glPopMatrix(); glEnable(GL_LIGHTING);
+            const auto models = executableDirectory() / "assets" / "models";
+            const char* files[] = { "slots-cabinet.nxm", "slots-lever.nxm", "slots-stool.nxm", "bar-counter.nxm" };
+            for (int prop=0; prop<4; ++prop) refugePropMeshes_[prop] = loadCreatureMesh(models / files[prop]);
+            for (int reel=0;reel<3;++reel) for (int symbol=0;symbol<4;++symbol)
+                reelMeshes_[reel][symbol]=loadCreatureMesh(models/("slots-reel-"+std::to_string(reel)+"-"+std::to_string(symbol)+".nxm"));
+            slotsTexture_ = loadSurfaceTexture(models / "slots.png", 1024);
+            barTexture_ = loadSurfaceTexture(models / "bar.png", 1024);
+            refugePropsAttempted_ = true;
         }
-        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, dark);
-        const float handlePull = std::clamp((refugeSlots_[safehouseAt(house, safehouses_)].stopTime - elapsed_ - 1.2f) / .8f, 0.f, 1.f);
-        glColor3f(.65f, .69f, .72f);
-        part(hx - .56f, .50f, hz - .85f + handlePull * .18f, .04f, .37f - handlePull * .16f, .04f);
-        glColor3f(.92f, .12f, .22f);
-        part(hx - .56f, .87f - handlePull * .16f, hz - .85f + handlePull * .18f, .10f, .09f, .10f);
+        glColor3f(1.f,1.f,1.f);
+        glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, slotsTexture_);
+        glPushMatrix(); glTranslatef(hx - .85f, 0.f, hz - .85f); glScalef(.45f,1.f,.45f);
+        if (refugePropMeshes_[0]) glCallList(refugePropMeshes_[0]);
+        const auto& machine = refugeSlots_[safehouseAt(house, safehouses_)];
+        for (int reel=0;reel<3;++reel)
+        {
+            const bool spinning=elapsed_<machine.stopTime-(2-reel)*.25f;
+            const int symbol=spinning?(static_cast<int>(elapsed_*18.f)+reel)%4:machine.symbols[reel];
+            glPushMatrix();
+            if (spinning) glTranslatef(0.f,.003f*std::sin(elapsed_*90.f+reel),0.f);
+            if (reelMeshes_[reel][symbol]) glCallList(reelMeshes_[reel][symbol]);
+            glPopMatrix();
+        }
+        const float pull = std::clamp((machine.stopTime - elapsed_ - 1.2f) / .8f, 0.f, 1.f);
+        // Pivot is retained from the downloaded Lever node, not a replacement mesh.
+        glPushMatrix(); glTranslatef(.6701586f,.6501679f,-.1783184f);
+        glRotatef(-65.f * std::sin(pull * pi),1.f,0.f,0.f);
+        glTranslatef(-.6701586f,-.6501679f,.1783184f);
+        if (refugePropMeshes_[1]) glCallList(refugePropMeshes_[1]);
+        glPopMatrix(); glPopMatrix();
+        glBindTexture(GL_TEXTURE_2D, barTexture_);
+        glPushMatrix(); glTranslatef(hx - .85f,0.f,hz + .85f); glRotatef(90.f,0.f,1.f,0.f);
+        if (refugePropMeshes_[3]) glCallList(refugePropMeshes_[3]);
+        glPopMatrix(); glDisable(GL_TEXTURE_2D);
         glPopMatrix();
     }
     drawDoors(game);
@@ -2191,8 +2350,8 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     }
     glPopMatrix();
     const float blend = std::clamp(monsterClock_ / monsterStepDuration_, 0.f, 1.f);
-    const float mx = monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
-    const float mz = monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
+    const float mx = interiorHunter_ ? hunterX_ : monsterFrom_.col + .5f + (monster_.col - monsterFrom_.col) * blend;
+    const float mz = interiorHunter_ ? hunterZ_ : monsterFrom_.row + .5f + (monster_.row - monsterFrom_.row) * blend;
     if ((mx-x_)*(mx-x_) + (mz-z_)*(mz-z_) < 144.f)
     {
         if (creatureMesh_ && creatureTexture_)
@@ -2212,7 +2371,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             }
             glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, creatureTexture_);
             glColor3f(.85f, .85f, .85f);
-            glPushMatrix(); glTranslatef(mx, 0.f, mz);
+            glPushMatrix(); glTranslatef(mx, hunterY_, mz);
             glRotatef(monsterHeading_ * 180.f / pi, 0.f, 1.f, 0.f);
             glCallList(creatureMesh_); glPopMatrix();
             glDisable(GL_TEXTURE_2D);
@@ -2234,7 +2393,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
                 glDisable(GL_LIGHTING); glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, monsterTexture_);
                 glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE);
                 glColor4f(illumination, illumination, illumination, 1.f);
-                glPushMatrix(); glTranslatef(mx, 0.f, mz);
+                glPushMatrix(); glTranslatef(mx, hunterY_, mz);
                 glRotatef(std::atan2(x_ - mx, z_ - mz) * 180.f / pi, 0.f, 1.f, 0.f);
                 glBegin(GL_QUADS);
                 glTexCoord2f(0.f, 1.f); glVertex3f(-.62f, 0.f, 0.f);
@@ -2246,7 +2405,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             }
             else
             {
-                glPushMatrix(); glTranslatef(mx, 0.f, mz);
+                glPushMatrix(); glTranslatef(mx, hunterY_, mz);
                 glRotatef(std::atan2(x_ - mx, z_ - mz) * 180.f / pi, 0.f, 1.f, 0.f);
                 glColor3f(.12f, .10f, .085f);
                 const float sway = elapsed_ >= 12.f ? std::sin(elapsed_ * 7.f) * .08f : 0.f;
@@ -2273,7 +2432,8 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         const float distance = dx * dx + dz * dz;
         if (distance > .30f * .30f && distance < 144.f)
         {
-            glPushMatrix(); glTranslatef(visual.x, visual.elevation, visual.z);
+            glPushMatrix(); glTranslatef(visual.x, visual.elevation+visual.jumpHeight, visual.z);
+            if (visual.crouched) glScalef(1.f,.64f,1.f);
             glRotatef(visual.angle * 180.f / pi, 0.f, 1.f, 0.f);
             if (survivorMesh_ && survivorTexture_ && survivorFrames_ > 1 && survivorDuration_ > 0.f)
             {
@@ -2308,6 +2468,35 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, dark); glPopMatrix();
         }
     }
+    if (!handsAttempted_)
+    {
+        const auto models=executableDirectory()/"assets"/"models";
+        handMeshes_[0]=loadCreatureMesh(models/"hands-l.nxm");
+        handMeshes_[1]=loadCreatureMesh(models/"hands-r.nxm");
+        handTexture_=loadSurfaceTexture(models/"survivor.png",1024);
+        handsAttempted_=true;
+    }
+    // First-person source meshes follow the camera, never a procedural hand.
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+    glDisable(GL_FOG); sf::Shader::bind(nullptr);
+    const GLfloat handAmbient[]={.72f,.62f,.52f,1.f};
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT,handAmbient);
+    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D,handTexture_); glColor3f(1.f,1.f,1.f);
+    for (int side=0;side<2;++side)
+    {
+        const float sway=std::sin(bobPhase_+side*1.2f)*bobBlend_*.007f;
+        glPushMatrix();
+        glTranslatef(side==0?-.16f:.16f,-.12f+sway-crouchBlend_*.012f,-.31f);
+        if (side==1 && drinkClock_>1.f)
+        { glTranslatef(-.05f,.06f,-.02f); glRotatef(-55.f*std::sin((4.f-drinkClock_)/3.f*pi),1.f,0.f,0.f); }
+        else if (side==1 && nearbySlotHandle()>=0 && elapsed_<refugeSlots_[nearbySlotHandle()].stopTime)
+        { glTranslatef(-.02f,.025f,-.09f); glRotatef(-15.f,0.f,1.f,0.f); }
+        glRotatef(180.f,0.f,1.f,0.f);
+        if (handMeshes_[side]) glCallList(handMeshes_[side]);
+        glPopMatrix();
+    }
+    glDisable(GL_TEXTURE_2D); glLightModelfv(GL_LIGHT_MODEL_AMBIENT,ambient); glEnable(GL_FOG);
+    glPopMatrix();
     if (usePost)
     {
         framebufferApi().bindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFramebuffer));
@@ -2378,7 +2567,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         const auto& machine = refugeSlots_[nearbySlotHandle()];
         const bool spinning = elapsed_ < machine.stopTime;
         const bool jackpot = machine.spins && machine.symbols[0] == machine.symbols[1] && machine.symbols[1] == machine.symbols[2];
-        feedback_.setString(spinning ? "LUCKY LANTERN / Reels spinning..." : jackpot ? "JACKPOT! / E pull handle / Free play" : "LUCKY LANTERN / E pull red handle / Match three / Free play");
+        feedback_.setString(spinning ? "LUCKY LANTERN / Reels spinning..." : jackpot ? "JACKPOT! / E pull handle / Free play" : "LUCKY LANTERN / E pull handle / Match three / Free play");
         feedback_.setPosition({24.f,78.f}); target.draw(feedback_);
     }
     else if (door >= 0)
@@ -2416,11 +2605,11 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         const int house = safehouseAt(game.player, safehouses_);
         feedback_.setString(elevation_ > refugeUpperFloor - .1f
             ? "G pick up / throw basketball | K kick football\nHOOP " + std::to_string(refugeBalls_[house][1].scoreA) + " | FOOTBALL " + std::to_string(refugeBalls_[house][0].scoreA) + " - " + std::to_string(refugeBalls_[house][0].scoreB)
-            : "REFUGE / E doors / F field note / J journal / SPACE slots / games upstairs");
+            : "HOUSE / E doors, slots, bar / F note / J journal\nSpace jump / Ctrl crouch / Games upstairs");
         feedback_.setPosition({ 24.f, 78.f }); target.draw(feedback_);
         if (messageClock_ > 0.f)
         {
-            feedback_.setString(notice_); feedback_.setPosition({ 24.f, elevation_ > refugeUpperFloor - .1f ? 136.f : 106.f }); target.draw(feedback_);
+            feedback_.setString(notice_); feedback_.setPosition({ 24.f, 136.f }); target.draw(feedback_);
         }
     }
     else if (messageClock_ > 0.f)

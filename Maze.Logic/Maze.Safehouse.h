@@ -28,7 +28,7 @@ inline float refugeFloorHeight(float x, float z, float previous,
     return 0.f;
 }
 
-// The 5x5 refuge is passable for players and forbidden to the hunter.
+// The 5x5 cabin footprint defines shelter geometry, not monster immunity.
 inline bool insideSafehouse(MazePosition cell, MazePosition center) noexcept
 {
     return std::abs(cell.row - center.row) <= 2 && std::abs(cell.col - center.col) <= 2;
@@ -39,6 +39,19 @@ inline int safehouseAt(MazePosition cell, const std::vector<MazePosition>& house
     for (std::size_t i = 0; i < houses.size(); ++i)
         if (insideSafehouse(cell, houses[i])) return static_cast<int>(i);
     return -1;
+}
+
+// Cabin wall crossings must use the centre doorway on each side.
+inline bool refugeEdgeAllowed(MazePosition from, MazePosition to,
+    const std::vector<MazePosition>& houses) noexcept
+{
+    for (const auto house : houses)
+    {
+        if (insideSafehouse(from, house) == insideSafehouse(to, house)) continue;
+        if (from.row != to.row && from.col != house.col) return false;
+        if (from.col != to.col && from.row != house.row) return false;
+    }
+    return true;
 }
 
 // Geometry shared by the renderer, collision and interaction code. Side 0..3

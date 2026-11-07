@@ -193,6 +193,10 @@ Fear is a smoothed 0..1 value built from creature proximity, darkness, pursuit
 and safehouse shelter. It feeds camera sway, flashlight interference, heartbeat
 rate, the post shader and the creature's door rattles. Safehouse doors are four
 per refuge; the host stores their open state in one bit mask appended to the
-version-4 world snapshot. Guests animate the received mask locally. A closed
+version-9 world snapshot. Guests animate the received mask locally. A closed
 door blocks the threshold, an open door does not, and the creature may slam an
-open door but can never enter the refuge itself.
+open door. The hunter routes through doorway centres, strikes closed doors
+three times to force them, and follows continuous stair waypoints to pursue
+upstairs. Captures compare interpolated XYZ height. Repeated detections raise
+vigilance, hearing range and search memory. Slots and the bar create temporary
+noise targets; crouching reduces sound and detection range.

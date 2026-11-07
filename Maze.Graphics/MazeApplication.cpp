@@ -31,7 +31,6 @@ namespace
 
     char networkKey(sf::Keyboard::Key key)
     {
-        if (key == sf::Keyboard::Key::Space) return 'S';
         if (key == sf::Keyboard::Key::G) return 'G';
         if (key == sf::Keyboard::Key::K) return 'K';
         if (key == sf::Keyboard::Key::E) return 'E';
@@ -49,7 +48,6 @@ namespace
 
     sf::Keyboard::Key decodeNetworkKey(char key)
     {
-        if (key == 'S') return sf::Keyboard::Key::Space;
         if (key == 'G') return sf::Keyboard::Key::G;
         if (key == 'K') return sf::Keyboard::Key::K;
         if (key == 'E') return sf::Keyboard::Key::E;
@@ -143,7 +141,7 @@ void MazeApplication::sendPlayer()
     if (!player.present) return;
     if (game_.phase != GamePhase::Playing || networkPaused_) player.moving = player.running = false;
     std::ostringstream out; out.precision(8);
-    out << "P " << player.x << ' ' << player.z << ' ' << player.angle << ' ' << player.moving << ' ' << player.running << ' ' << player.elevation;
+    out << "P " << player.x << ' ' << player.z << ' ' << player.angle << ' ' << player.moving << ' ' << player.running << ' ' << player.elevation << ' ' << player.jumpHeight << ' ' << player.crouched;
     network_.send(out.str());
 }
 
@@ -186,14 +184,14 @@ void MazeApplication::updateNetwork(float seconds)
         }
         if (networkRole_ == NetworkRole::Host && type == 'P' && gameView_.initialized())
         {
-            RemotePlayer player; int moving, running; std::string extra;
-            if (!(in >> player.x >> player.z >> player.angle >> moving >> running >> player.elevation) || (in >> extra) ||
-                !std::isfinite(player.elevation) || player.elevation < 0.f || player.elevation > refugeUpperFloor || !std::isfinite(player.x) || !std::isfinite(player.z) || !std::isfinite(player.angle) ||
+            RemotePlayer player; int moving, running, crouching; std::string extra;
+            if (!(in >> player.x >> player.z >> player.angle >> moving >> running >> player.elevation >> player.jumpHeight >> crouching) || (in >> extra) ||
+                !std::isfinite(player.jumpHeight) || player.jumpHeight<0.f || player.jumpHeight>.6f || (crouching!=0 && crouching!=1) || !std::isfinite(player.elevation) || player.elevation < 0.f || player.elevation > refugeUpperFloor || !std::isfinite(player.x) || !std::isfinite(player.z) || !std::isfinite(player.angle) ||
                 player.x < 0 || player.z < 0 || player.x >= game_.maze.size().cols || player.z >= game_.maze.size().rows ||
                 (moving != 0 && moving != 1) || (running != 0 && running != 1)) continue;
             const MazePosition cell{ static_cast<int>(player.z), static_cast<int>(player.x) };
             if (game_.maze.at(cell.row, cell.col) == MazeCell::Wall) continue;
-            player.moving = moving != 0; player.running = running != 0; player.present = true;
+            player.moving = moving != 0; player.running = running != 0; player.present = true; player.crouched=crouching!=0;
             gameView_.setRemotePlayer(message.peer, player);
             if (game_.maze.at(cell.row, cell.col) == MazeCell::Exit && gameView_.gateOpen() && game_.phase == GamePhase::Playing)
             {
@@ -216,7 +214,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             unsigned version, generation, seed, phase; int rows, cols, selfSlot;
             if (!(in >> version)) continue;
-            if (version != 7)
+            if (version != 9)
             {
                 endNetwork(); menu_.showMultiplayer(); menu_.showMessage("Different game version. Everyone needs the same build.");
                 return;
@@ -292,7 +290,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             if (!(network_.connectedMask() & (1u << slot))) continue;
             std::ostringstream out;
-            out << "W 7 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
+            out << "W 9 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
                 << ' ' << *game_.mazeSeed << ' ' << phase << ' ' << slot << ' ' << world;
             network_.send(out.str(), slot);
         }

@@ -1,5 +1,29 @@
 # Refuge upgrade validation
 
+## Downloaded-prop horror upgrade (current)
+
+Release Graphics and CoopSmoke builds pass with VS2022 v143 override. Unit suite:
+140/140 pass. Expanded real TCP smoke passes protocol-9 stances, guest bar
+restoration without host restoration, independent drink cooldowns, forced-door
+entry, upstairs ascent/descent/pursuit and height-aware captures. Original sports,
+puzzles, reconnects, room capacity and shared victory checks also pass.
+
+Required imported cabinet/lever/bar/reel/hand meshes and textures load. Renderer
+reports `Screen-space ray tracing active: 1`. Ground, gallery and spin frames
+reviewed under build/refuge-*.png. A fixed-camera test changes settled source reel
+states and verifies visible pixel differences within the model area, excluding
+the HUD. Audio checks cover separate slot/drink cues, pause fade and continuous
+block equivalence. Sound synthesis and device routing are retained; these tests
+do not constitute a subjective headphone listening assessment.
+
+Downloaded-model credits/licenses are included with the assets. No new prop or
+hand geometry was authored; source geometry was selected, converted, textured
+and animated. Hand rendering retains the source's angular visual style.
+
+Final artifact and launch receipts for this upgrade are appended below. Earlier
+artifact evidence in this document is historical and identifies the previous
+release, not the current upgrade.
+
 Verified on Windows x64 with installed VS2022 BuildTools v143 (project toolset
 overridden on the MSBuild command line).
 

@@ -15,6 +15,7 @@ struct HunterState
     MazePosition lastKnown{};
     HunterMode mode = HunterMode::Patrol;
     int memory = 0;
+    unsigned vigilance = 0;
     std::uint32_t random = 1;
 };
 
@@ -23,6 +24,8 @@ struct HunterTarget
     MazePosition cell{};
     bool moving = false;
     bool running = false;
+    int noise = 0;
+    bool crouched = false;
 };
 
 // Select a reproducible patrol start away from the entrance, gate, stones and

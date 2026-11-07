@@ -29,19 +29,23 @@ namespace MazeUnitTest
             Assert::IsTrue(safehouseAt(first.cell,houses)<0);
             Assert::IsFalse(relocateDistantHunter(maze,first,&player,1,stones,houses,42,2));
         }
-        TEST_METHOD(HunterCannotEnterOrDetectAPlayerInsideASafehouse)
+        TEST_METHOD(HunterEntersRefugesAndLearnsFromRepeatedDetections)
         {
             MazeGrid maze({10,10});
-            for (int col = 0; col < 10; ++col) maze.at(4,col) = MazeCell::Passage;
-            const std::vector<MazePosition> houses{ {4,5} };
-            HunterState hunter; hunter.cell = {4,2}; hunter.previous = {4,1}; hunter.random = 7;
-            const HunterTarget player{ {4,5}, true, true };
-            for (int step = 0; step < 30; ++step)
+            for (int col=0;col<10;++col) maze.at(4,col)=MazeCell::Passage;
+            const std::vector<MazePosition> houses{{4,5}};
+            HunterState hunter; hunter.cell={4,2}; hunter.previous={4,1}; hunter.random=7;
+            const HunterTarget player{{4,5},true,true};
+            bool entered=false;
+            for (int step=0;step<8;++step)
             {
-                advanceHunterGroup(maze, hunter, &player, 1, houses);
-                Assert::IsTrue(safehouseAt(hunter.cell, houses) < 0);
-                Assert::IsTrue(hunter.mode == HunterMode::Patrol);
+                advanceHunterGroup(maze,hunter,&player,1,houses);
+                entered=entered || safehouseAt(hunter.cell,houses)>=0;
             }
+            Assert::IsTrue(entered && hunter.vigilance>0);
+            Assert::IsTrue(hunter.mode==HunterMode::Chase);
+            Assert::IsFalse(refugeEdgeAllowed({1,4},{2,4},houses));
+            Assert::IsTrue(refugeEdgeAllowed({1,5},{2,5},houses));
         }
         TEST_METHOD(CoopHunterSeesEitherPlayerAndPrioritizesSightOverNoise)
         {
