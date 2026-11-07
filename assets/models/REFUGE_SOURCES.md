@@ -28,5 +28,18 @@ Derived files: bar-counter.nxm, bar.png, bar.json. Changes: node transforms and
 quantized coordinates decoded, materials baked to atlas, scaled and recentered.
 No mesh was authored here.
 
+## Bar seating and drink vessel
+
+`bar-stool.nxm` recentres the original Pillar Slots stool above, retaining its
+CC BY 4.0 attribution, geometry and material atlas. It supplies the bar seat.
+
+`drink-cup.nxm`, `drink.png`, `drink.json` derive from Innerscene's
+[Tumbler - Original Drink Vessel](https://www.innerscene.com/tools/library/3d-parts/tumbler-original-drink-vessel-9515096d),
+released under CC0 1.0. Download:
+https://files.innerscene.com/library/tumbler-original-drink-vessel-9515096d/a5222f60956b54f06cb6/tumbler-original-drink-vessel.glb
+Changes: material atlas conversion, scaling to 0.14m height and opaque legacy
+glass shading. Original source triangles are preserved. It is attached to the
+same animated transform as the drinking hand.
+
 Reproduce with tools/prepare_refuge_props.py using source GLBs placed under
 build/asset-sources. Runtime does not require Python or the conversion libraries.

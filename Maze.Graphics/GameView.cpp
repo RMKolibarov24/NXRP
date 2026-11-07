@@ -1,4 +1,5 @@
 #include "GameView.h"
+#include "InteractionPose.h"
 #include "Maze.Puzzle.h"
 #include "Maze.Atmosphere.h"
 #include "Maze.CreatureMesh.h"
@@ -407,6 +408,7 @@ void GameView::resetFeedback() { }
 
 void GameView::initialize(GameState& game)
 {
+    seatedHouse_=-1; seatedBlend_=ballHoldBlend_=throwClock_=0.f; heldBallLast_=false;
     interiorHunter_=false; interiorHouse_=-1; hunterY_=0.f;
     x_ = z_ = .5f; elevation_ = 0.f; jumpHeight_ = jumpVelocity_ = crouchBlend_ = 0.f; crouched_ = jumpHeld_ = false;
     const bool south = open(game.maze, 1, 0);
@@ -506,6 +508,7 @@ void GameView::handleEvent(const sf::Event& event, GameState& game)
     if (!initialized_ || game.phase != GamePhase::Playing) return;
     const auto* key = event.getIf<sf::Event::KeyPressed>();
     if (!key) return;
+    if (key->code==sf::Keyboard::Key::Q) { seatedHouse_=-1; drinkClock_=0.f; notice_="You stand up."; messageClock_=2.f; return; }
     if (key->code == sf::Keyboard::Key::G || key->code == sf::Keyboard::Key::K)
     { if (!networkGuest_) playRefugeBall(key->code == sf::Keyboard::Key::G, networkSelfSlot_); return; }
     if (key->code == sf::Keyboard::Key::J || key->code == sf::Keyboard::Key::F)
@@ -592,12 +595,19 @@ int GameView::nearbySlotHandle() const
     return -1;
 }
 
+void GameView::alignSlotView(int house)
+{
+    const auto knob=slotKnobPoint(safehouses_[house],0.f,2.f);
+    x_=knob.x+.52f;z_=knob.z+.05f;angle_=std::atan2(-.52f,-.05f);pitch_=.23f;
+}
 void GameView::pullSlotHandle(const GameState& game)
 {
     const int house = nearbySlotHandle();
     if (house < 0) { notice_ = "Face the red cabinet handle and press E to pull."; messageClock_ = 3.f; return; }
     auto& machine = refugeSlots_[house];
     if (elapsed_ < machine.stopTime) return;
+    if(interactionSlot_==networkSelfSlot_) alignSlotView(house);
+    machine.actor=interactionSlot_;
     machine.stopTime = elapsed_ + 2.f;
     refugeNoise_[house] = 5.f;
     std::mt19937 random(game.mazeSeed.value_or(0) ^ (++machine.spins * 2654435761u) ^ (house * 0x85ebca6bu));
@@ -701,26 +711,38 @@ bool GameView::nearInscription() const
     return dx * dx + dz * dz < .7f * .7f;
 }
 
+int GameView::nearbyBar() const
+{
+    if(elevation_>.1f) return -1;
+    for(std::size_t house=0;house<safehouses_.size();++house)
+    {
+        const float dx=x_-(safehouses_[house].col+.5f-.85f*refugeScale);
+        const float dz=z_-(safehouses_[house].row+.5f+.85f*refugeScale);
+        if(std::abs(dx)<1.2f && std::abs(dz)<.95f) return static_cast<int>(house);
+    }
+    return -1;
+}
+void GameView::sitAtBar(int house)
+{
+    seatedHouse_=house;
+    x_=safehouses_[house].col+.5f-.85f*refugeScale+1.10f;
+    z_=safehouses_[house].row+.5f+.85f*refugeScale;
+    angle_=-pi*.5f; pitch_=0.f; jumpHeight_=jumpVelocity_=0.f;
+}
 void GameView::interact(GameState& game)
 {
     if (nearbySlotHandle() >= 0) { pullSlotHandle(game); return; }
-    if (elevation_ < .1f)
+    const int bar=nearbyBar();
+    if(bar>=0)
     {
-        for (std::size_t house=0; house<safehouses_.size(); ++house)
-        {
-            const float dx=x_-(safehouses_[house].col+.5f-.85f*refugeScale);
-            const float dz=z_-(safehouses_[house].row+.5f+.85f*refugeScale);
-            if (dx*dx+dz*dz < .85f*.85f)
-            {
-                if (drinkCooldowns_[interactionSlot_] > 0.f) return;
-                drinkCooldowns_[interactionSlot_]=4.f; ++drinks_[interactionSlot_];
-                if (interactionSlot_ == networkSelfSlot_)
-                { drinkClock_=4.f; stamina_=1.f; fear_=std::max(0.f,fear_-.15f); }
-                refugeNoise_[house]=4.f;
-                notice_="You drink at the bar. A glass clinks. Something outside stops to listen.";
-                messageClock_=5.f; return;
-            }
-        }
+        if (drinkCooldowns_[interactionSlot_] > 0.f)
+        { notice_="BAR / Finishing your drink... / Q stand"; messageClock_=2.f; return; }
+        drinkCooldowns_[interactionSlot_]=4.f; ++drinks_[interactionSlot_];
+        if (interactionSlot_ == networkSelfSlot_)
+        { sitAtBar(bar); drinkClock_=4.f; stamina_=1.f; fear_=std::max(0.f,fear_-.15f); }
+        refugeNoise_[bar]=4.f;
+        notice_="You sit at the bar and drink. E another drink / Q stand.";
+        messageClock_=5.f; return;
     }
     const int door = elevation_ < .1f ? nearbyDoor() : -1;
     if (door >= 0)
@@ -763,7 +785,7 @@ void GameView::resetHunter(const GameState& game)
 
 RemotePlayer GameView::localPlayer() const noexcept
 {
-    return { x_, z_, angle_, soundMoving_ || (crouched_ && bobBlend_ > .1f), soundRunning_, initialized_, elevation_, jumpHeight_, crouched_ };
+    return { x_, z_, angle_, soundMoving_ || (crouched_ && bobBlend_ > .1f), soundRunning_, initialized_, elevation_, jumpHeight_, crouched_, seatedHouse_>=0 };
 }
 
 void GameView::setRemotePlayer(int slot, const RemotePlayer& player) noexcept
@@ -805,12 +827,12 @@ std::string GameView::worldSnapshot() const
     for (unsigned i = 0; i < discoveredClues_.size(); ++i) if (discoveredClues_[i]) clues |= 1u << i;
     std::ostringstream out;
     out.precision(8);
-    out << x_ << ' ' << z_ << ' ' << angle_ << ' ' << soundMoving_ << ' ' << soundRunning_ << ' ' << elevation_ << ' ' << jumpHeight_ << ' ' << crouched_;
+    out << x_ << ' ' << z_ << ' ' << angle_ << ' ' << soundMoving_ << ' ' << soundRunning_ << ' ' << elevation_ << ' ' << jumpHeight_ << ' ' << crouched_ << ' ' << (seatedHouse_>=0);
     for (int slot = 1; slot < maxCoopPlayers; ++slot)
     {
         const auto& player = remote_[slot];
         out << ' ' << player.present << ' ' << player.x << ' ' << player.z << ' ' << player.angle
-            << ' ' << player.moving << ' ' << player.running << ' ' << player.elevation << ' ' << player.jumpHeight << ' ' << player.crouched;
+            << ' ' << player.moving << ' ' << player.running << ' ' << player.elevation << ' ' << player.jumpHeight << ' ' << player.crouched << ' ' << player.seated;
     }
     out << ' '
         << monsterFrom_.row << ' ' << monsterFrom_.col << ' ' << monster_.row << ' ' << monster_.col << ' '
@@ -825,7 +847,7 @@ std::string GameView::worldSnapshot() const
     for (const auto& balls : refugeBalls_) for (const auto& b : balls)
         out << ' ' << b.x << ' ' << b.y << ' ' << b.z << ' ' << b.vx << ' ' << b.vy << ' ' << b.vz << ' ' << b.carrier << ' ' << b.scoreA << ' ' << b.scoreB;
     for (const auto& machine : refugeSlots_)
-        out << ' ' << machine.spins << ' ' << machine.stopTime << ' ' << machine.symbols[0] << ' ' << machine.symbols[1] << ' ' << machine.symbols[2];
+        out << ' ' << machine.spins << ' ' << machine.stopTime << ' ' << machine.symbols[0] << ' ' << machine.symbols[1] << ' ' << machine.symbols[2] << ' ' << machine.actor;
     for (const auto count : drinks_) out << ' ' << count;
     out << ' ' << interiorHunter_ << ' ' << hunterX_ << ' ' << hunterY_ << ' ' << hunterZ_;
     return out.str();
@@ -836,7 +858,7 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     if (!initialized_ || game.maze.empty() || selfSlot < 1 || selfSlot >= maxCoopPlayers) return false;
     std::istringstream in(data);
     std::array<RemotePlayer, maxCoopPlayers> players{};
-    std::array<int, maxCoopPlayers> presence{}, moving{}, running{}, crouching{};
+    std::array<int, maxCoopPlayers> presence{}, moving{}, running{}, crouching{}, seating{};
     std::array<std::uint32_t, maxCoopPlayers> captures{};
     std::array<int, maxCoopPlayers> checkpoints{};
     MazePosition from{}, monster{}, shift{};
@@ -845,9 +867,9 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     unsigned clues, activeStones, doorsMask;
     std::string input, extra;
     presence[0] = 1;
-    if (!(in >> players[0].x >> players[0].z >> players[0].angle >> moving[0] >> running[0] >> players[0].elevation >> players[0].jumpHeight >> crouching[0])) return false;
+    if (!(in >> players[0].x >> players[0].z >> players[0].angle >> moving[0] >> running[0] >> players[0].elevation >> players[0].jumpHeight >> crouching[0] >> seating[0])) return false;
     for (int slot = 1; slot < maxCoopPlayers; ++slot)
-        if (!(in >> presence[slot] >> players[slot].x >> players[slot].z >> players[slot].angle >> moving[slot] >> running[slot] >> players[slot].elevation >> players[slot].jumpHeight >> crouching[slot])) return false;
+        if (!(in >> presence[slot] >> players[slot].x >> players[slot].z >> players[slot].angle >> moving[slot] >> running[slot] >> players[slot].elevation >> players[slot].jumpHeight >> crouching[slot] >> seating[slot])) return false;
     if (!(in >> from.row >> from.col >> monster.row >> monster.col >> clock >> duration >> heading >> gait
         >> elapsed >> ambient >> hunterMode >> phase >> shift.row >> shift.col >> progress >> solved >> activeStones >> inscription >> gate
         >> input >> clues)) return false;
@@ -866,8 +888,8 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     auto machines = refugeSlots_;
     for (auto& machine : machines)
     {
-        if (!(in >> machine.spins >> machine.stopTime >> machine.symbols[0] >> machine.symbols[1] >> machine.symbols[2])) return false;
-        if (!std::isfinite(machine.stopTime) || machine.stopTime < 0.f) return false;
+        if (!(in >> machine.spins >> machine.stopTime >> machine.symbols[0] >> machine.symbols[1] >> machine.symbols[2] >> machine.actor)) return false;
+        if (machine.actor<0 || machine.actor>=maxCoopPlayers || !std::isfinite(machine.stopTime) || machine.stopTime < 0.f) return false;
         for (const int symbol : machine.symbols) if (symbol < 0 || symbol > 3) return false;
     }
     std::array<std::uint32_t,maxCoopPlayers> drinks{};
@@ -886,7 +908,7 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     for (int slot = 0; slot < maxCoopPlayers; ++slot)
     {
         const auto& player = players[slot];
-        if (!finite(player.jumpHeight) || player.jumpHeight < 0.f || player.jumpHeight > .6f || (crouching[slot]!=0 && crouching[slot]!=1) || !finite(player.elevation) || player.elevation < 0.f || player.elevation > refugeUpperFloor || !finite(player.x) || !finite(player.z) || !finite(player.angle) || player.x < 0 || player.z < 0 ||
+        if (!finite(player.jumpHeight) || player.jumpHeight < 0.f || player.jumpHeight > .6f || (crouching[slot]!=0 && crouching[slot]!=1) || (seating[slot]!=0 && seating[slot]!=1) || !finite(player.elevation) || player.elevation < 0.f || player.elevation > refugeUpperFloor || !finite(player.x) || !finite(player.z) || !finite(player.angle) || player.x < 0 || player.z < 0 ||
             player.x >= size.cols || player.z >= size.rows || (presence[slot] != 0 && presence[slot] != 1) ||
             (moving[slot] != 0 && moving[slot] != 1) || (running[slot] != 0 && running[slot] != 1) ||
             checkpoints[slot] < -1 || checkpoints[slot] >= static_cast<int>(safehouses_.size())) return false;
@@ -913,7 +935,7 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
     for (int slot = 0; slot < maxCoopPlayers; ++slot)
     {
         if (slot == selfSlot || !presence[slot]) { remoteDisconnected(slot); continue; }
-        players[slot].moving = moving[slot] != 0; players[slot].running = running[slot] != 0; players[slot].present = true; players[slot].crouched=crouching[slot]!=0;
+        players[slot].moving = moving[slot] != 0; players[slot].running = running[slot] != 0; players[slot].present = true; players[slot].crouched=crouching[slot]!=0; players[slot].seated=seating[slot]!=0;
         setRemotePlayer(slot, players[slot]);
     }
     checkpoints_ = checkpoints; networkSelfSlot_ = selfSlot;
@@ -932,12 +954,14 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
                 ? std::clamp((-dx * std::cos(angle_) + dz * std::sin(angle_)) / distance, -1.f, 1.f) : 0.f;
         }
     refugeBalls_ = std::move(balls);
+    for(std::size_t house=0;house<machines.size();++house)
+        if(machines[house].spins!=refugeSlots_[house].spins && machines[house].actor==selfSlot) alignSlotView(static_cast<int>(house));
     refugeSlots_ = std::move(machines);
     interiorHunter_=interior!=0; hunterX_=hx; hunterY_=hy; hunterZ_=hz;
     drinks_=drinks;
     if (drinks_[selfSlot] != seenDrink_)
     {
-        seenDrink_=drinks_[selfSlot]; stamina_=1.f; fear_=std::max(0.f,fear_-.15f); drinkClock_=4.f;
+        seenDrink_=drinks_[selfSlot]; const int bar=nearbyBar(); if(bar>=0) sitAtBar(bar); stamina_=1.f; fear_=std::max(0.f,fear_-.15f); drinkClock_=4.f;
         notice_="You drink. The glass clinks; the hunter can hear it."; messageClock_=5.f;
     }
     monsterFrom_ = from; monster_ = monster; monsterClock_ = clock; monsterStepDuration_ = duration;
@@ -951,7 +975,7 @@ bool GameView::applyWorldSnapshot(GameState& game, const std::string& data, int 
         seenRemoteCaptures_ = captures[selfSlot];
         const int house = checkpoints_[selfSlot];
         const MazePosition respawn = house >= 0 ? safehouses_[house] : MazePosition{ 0, 0 };
-        x_ = respawn.col + .5f; z_ = respawn.row + .5f; elevation_ = 0.f;
+        seatedHouse_=-1;drinkClock_=0.f; x_ = respawn.col + .5f; z_ = respawn.row + .5f; elevation_ = 0.f;
         angle_ = open(game.maze, respawn.row + 1, respawn.col) ? 0.f : pi / 2.f; pitch_ = 0.f;
         game.player = respawn; stamina_ = 1.f; exhausted_ = false;
         notice_ = house >= 0 ? "It caught you. You wake in the safehouse." : "It caught you. You wake again at the entrance.";
@@ -1128,7 +1152,7 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
     {
         const int house = checkpoints_[0];
         const MazePosition respawn = house >= 0 ? safehouses_[house] : MazePosition{ 0, 0 };
-        x_ = respawn.col + .5f; z_ = respawn.row + .5f; elevation_ = 0.f;
+        seatedHouse_=-1;drinkClock_=0.f; x_ = respawn.col + .5f; z_ = respawn.row + .5f; elevation_ = 0.f;
         angle_ = open(game.maze, respawn.row + 1, respawn.col) ? 0.f : pi / 2.f; pitch_ = 0.f;
         game.player = respawn; gateInput_.clear();
         ++captureCount_; resetHunter(game);
@@ -1217,10 +1241,14 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
         visual.x += (player.x - visual.x) * blend;
         visual.z += (player.z - visual.z) * blend;
         visual.elevation += (player.elevation - visual.elevation) * blend;
-        visual.jumpHeight += (player.jumpHeight-visual.jumpHeight)*blend; visual.crouched=player.crouched;
+        visual.jumpHeight += (player.jumpHeight-visual.jumpHeight)*blend; visual.crouched=player.crouched; visual.seated=player.seated;
         visual.angle += std::remainder(player.angle - visual.angle, 2.f * pi) * blend;
         visual.moving = player.moving; visual.running = player.running;
     }
+    bool held=false; for(const auto& balls:refugeBalls_) held=held || balls[1].carrier==networkSelfSlot_;
+    if(heldBallLast_ && !held) throwClock_=.4f;
+    ballHoldBlend_+=((held?1.f:0.f)-ballHoldBlend_)*std::min(1.f,seconds*10.f);
+    heldBallLast_=held; throwClock_=std::max(0.f,throwClock_-seconds);
     drinkClock_ = std::max(0.f, drinkClock_ - seconds);
     for (auto& cooldown : drinkCooldowns_) cooldown=std::max(0.f,cooldown-seconds);
     for (auto& noise : refugeNoise_) noise=std::max(0.f,noise-seconds);
@@ -1230,12 +1258,17 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
     const auto currentStorm = sampleStorm(ambientTime_, game.mazeSeed.value_or(0)).event;
     if (currentStorm != previousStorm) ++thunderEvent_;
     angle_ -= std::clamp(input.turn, -1.f, 1.f) * 1.8f * seconds;
-    const float forward = std::clamp(input.forward, -1.f, 1.f);
-    const float strafe = std::clamp(input.strafe, -1.f, 1.f);
+    if(seatedHouse_>=0 && input.jump) { seatedHouse_=-1;drinkClock_=0.f; }
+    seatedBlend_ += ((seatedHouse_>=0?1.f:0.f)-seatedBlend_)*std::min(1.f,seconds*8.f);
+    bool pulling=false;
+    for(const auto& machine:refugeSlots_)
+    { const float t=elapsed_-(machine.stopTime-2.f);pulling=pulling || (machine.actor==networkSelfSlot_ && machine.spins && t>=0.f && t<1.3f); }
+    const float forward = seatedHouse_>=0 || pulling?0.f:std::clamp(input.forward, -1.f, 1.f);
+    const float strafe = seatedHouse_>=0 || pulling?0.f:std::clamp(input.strafe, -1.f, 1.f);
     const float length = std::sqrt(forward * forward + strafe * strafe);
     crouched_ = input.crouch && jumpHeight_ <= .001f;
     crouchBlend_ += ((crouched_ ? 1.f : 0.f) - crouchBlend_) * std::min(1.f, seconds * 12.f);
-    if (input.jump && !jumpHeld_ && !crouched_ && jumpHeight_ <= .001f && stamina_ > .08f)
+    if (input.jump && !pulling && !jumpHeld_ && !crouched_ && jumpHeight_ <= .001f && stamina_ > .08f)
     { jumpVelocity_ = 2.6f; stamina_ = std::max(0.f, stamina_ - .08f); }
     jumpHeld_ = input.jump;
     if (jumpVelocity_ != 0.f || jumpHeight_ > 0.f)
@@ -1262,6 +1295,8 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
         }
     }
     elevation_ = refugeFloorHeight(x_, z_, elevation_, safehouses_);
+    const MazePosition actualCell{static_cast<int>(z_),static_cast<int>(x_)};
+    if(game.maze.contains(actualCell)) game.player=actualCell;
     const bool moved = std::abs(x_ - oldX) + std::abs(z_ - oldZ) > .00001f;
     const int currentHouse = safehouseAt(game.player, safehouses_);
     if (currentHouse >= 0 && checkpoints_[networkSelfSlot_] != currentHouse)
@@ -1321,7 +1356,7 @@ void GameView::playRefugeBall(bool basketball, int slot)
     if (b.carrier == slot)
     {
         b.carrier = -1;
-        b.vx = std::sin(player.angle) * 2.4f; b.vz = std::cos(player.angle) * 2.4f; b.vy = 2.7f;
+        b.vx = std::sin(player.angle) * 2.4f; b.vz = std::cos(player.angle) * 2.4f; b.vy = 3.f;
         return;
     }
     const float dx = b.x - px, dz = b.z - pz;
@@ -1346,9 +1381,9 @@ void GameView::updateRefugeGames(float seconds)
             { b.carrier = -1; b.vx = b.vy = b.vz = 0.f; }
             else
             {
-                b.x = std::clamp(px + std::sin(player.angle) * .32f, -1.95f, .75f);
-                b.z = std::clamp(pz + std::cos(player.angle) * .32f, -1.95f, 1.95f);
-                b.y = .62f; continue;
+                b.x = std::clamp(px + std::sin(player.angle) * .52f, -1.95f, .75f);
+                b.z = std::clamp(pz + std::cos(player.angle) * .52f, -1.95f, 1.95f);
+                b.y = .54f - (player.crouched?.30f:0.f) + player.jumpHeight; continue;
             }
         }
         // Small fixed substeps keep hoop crossings and fast wall impacts stable.
@@ -2006,7 +2041,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
     const float fearSway = fear_ * (.0035f * std::sin(ambientTime_ * 1.7f)
         + .0018f * std::sin(ambientTime_ * 4.3f + 1.1f));
-    const float eyeHeight = elevation_ + jumpHeight_ - crouchBlend_ * .30f + .72f + .009f * bobBlend_ * std::sin(bobPhase_ * 2.f) + fearSway;
+    const float eyeHeight = elevation_ + jumpHeight_ - crouchBlend_ * .30f + seatedBlend_*.06f + .72f + .009f * bobBlend_ * std::sin(bobPhase_ * 2.f) + fearSway;
     const float roll = .35f * bobBlend_ * std::sin(bobPhase_)
         + fear_ * 1.15f * std::sin(ambientTime_ * 1.13f + .7f);
     const double nearPlane = .05, top = nearPlane * .65 * (1.0 + .035 * sprintBlend_);
@@ -2183,6 +2218,9 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
                 reelMeshes_[reel][symbol]=loadCreatureMesh(models/("slots-reel-"+std::to_string(reel)+"-"+std::to_string(symbol)+".nxm"));
             slotsTexture_ = loadSurfaceTexture(models / "slots.png", 1024);
             barTexture_ = loadSurfaceTexture(models / "bar.png", 1024);
+            barStoolMesh_=loadCreatureMesh(models/"bar-stool.nxm");
+            drinkMesh_=loadCreatureMesh(models/"drink-cup.nxm");
+            drinkTexture_=loadSurfaceTexture(models/"drink.png",1024);
             refugePropsAttempted_ = true;
         }
         glColor3f(1.f,1.f,1.f);
@@ -2199,17 +2237,28 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             if (reelMeshes_[reel][symbol]) glCallList(reelMeshes_[reel][symbol]);
             glPopMatrix();
         }
-        const float pull = std::clamp((machine.stopTime - elapsed_ - 1.2f) / .8f, 0.f, 1.f);
+        const float pull = slotLeverDegrees(elapsed_,machine.stopTime);
         // Pivot is retained from the downloaded Lever node, not a replacement mesh.
         glPushMatrix(); glTranslatef(.6701586f,.6501679f,-.1783184f);
-        glRotatef(-65.f * std::sin(pull * pi),1.f,0.f,0.f);
+        glRotatef(pull,1.f,0.f,0.f);
         glTranslatef(-.6701586f,-.6501679f,.1783184f);
         if (refugePropMeshes_[1]) glCallList(refugePropMeshes_[1]);
         glPopMatrix(); glPopMatrix();
         glBindTexture(GL_TEXTURE_2D, barTexture_);
-        glPushMatrix(); glTranslatef(hx - .85f,0.f,hz + .85f); glRotatef(90.f,0.f,1.f,0.f);
+        glPushMatrix(); glTranslatef(hx - .85f,0.f,hz + .85f); glRotatef(90.f,0.f,1.f,0.f); glScalef(1.f,.70f,1.f);
         if (refugePropMeshes_[3]) glCallList(refugePropMeshes_[3]);
-        glPopMatrix(); glDisable(GL_TEXTURE_2D);
+        glPopMatrix();
+        glBindTexture(GL_TEXTURE_2D,slotsTexture_);
+        glPushMatrix();glTranslatef(hx-.85f+1.10f/refugeScale,0.f,hz+.85f);
+        if(barStoolMesh_) glCallList(barStoolMesh_);
+        glPopMatrix();
+        if (!(seatedHouse_==safehouseAt(house,safehouses_) && drinkClock_>0.f))
+        {
+            glBindTexture(GL_TEXTURE_2D,drinkTexture_);
+            glPushMatrix();glTranslatef(hx-.85f,.64f,hz+.85f);
+            glColor3f(.65f,.80f,.87f);if(drinkMesh_) glCallList(drinkMesh_);glColor3f(1.f,1.f,1.f);glPopMatrix();
+        }
+        glDisable(GL_TEXTURE_2D);
         glPopMatrix();
     }
     drawDoors(game);
@@ -2433,7 +2482,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         if (distance > .30f * .30f && distance < 144.f)
         {
             glPushMatrix(); glTranslatef(visual.x, visual.elevation+visual.jumpHeight, visual.z);
-            if (visual.crouched) glScalef(1.f,.64f,1.f);
+            if (visual.crouched || visual.seated) glScalef(1.f,.64f,1.f);
             glRotatef(visual.angle * 180.f / pi, 0.f, 1.f, 0.f);
             if (survivorMesh_ && survivorTexture_ && survivorFrames_ > 1 && survivorDuration_ > 0.f)
             {
@@ -2473,6 +2522,13 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         const auto models=executableDirectory()/"assets"/"models";
         handMeshes_[0]=loadCreatureMesh(models/"hands-l.nxm");
         handMeshes_[1]=loadCreatureMesh(models/"hands-r.nxm");
+        for(int side=0;side<2;++side)
+        {
+            const std::string name=side==0?"hands-l":"hands-r";
+            std::ifstream open(models/(name+".nxm"),std::ios::binary),grip(models/(name+"-grip.nxm"),std::ios::binary);
+            handOpen_[side]=readCreatureMesh(open);handGrip_[side]=readCreatureMesh(grip);
+            if(handOpen_[side] && handGrip_[side] && (handOpen_[side]->indices!=handGrip_[side]->indices || handOpen_[side]->vertices.size()!=handGrip_[side]->vertices.size())) handGrip_[side].reset();
+        }
         handTexture_=loadSurfaceTexture(models/"survivor.png",1024);
         handsAttempted_=true;
     }
@@ -2482,17 +2538,74 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     const GLfloat handAmbient[]={.72f,.62f,.52f,1.f};
     glLightModelfv(GL_LIGHT_MODEL_AMBIENT,handAmbient);
     glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D,handTexture_); glColor3f(1.f,1.f,1.f);
+    const auto toCamera=[&](InteractionPoint p)
+    {
+        const float dx=p.x-x_,dy=p.y-eyeHeight,dz=p.z-z_;
+        const float forward=dx*std::sin(angle_)+dz*std::cos(angle_);
+        return InteractionPoint{-dx*std::cos(angle_)+dz*std::sin(angle_),dy*std::cos(pitch_)-forward*std::sin(pitch_),-forward*std::cos(pitch_)-dy*std::sin(pitch_)};
+    };
+    int heldHouse=-1;
+    for(std::size_t house=0;house<refugeBalls_.size();++house)
+        if(refugeBalls_[house][1].carrier==networkSelfSlot_) heldHouse=static_cast<int>(house);
     for (int side=0;side<2;++side)
     {
         const float sway=std::sin(bobPhase_+side*1.2f)*bobBlend_*.007f;
-        glPushMatrix();
-        glTranslatef(side==0?-.16f:.16f,-.12f+sway-crouchBlend_*.012f,-.31f);
-        if (side==1 && drinkClock_>1.f)
-        { glTranslatef(-.05f,.06f,-.02f); glRotatef(-55.f*std::sin((4.f-drinkClock_)/3.f*pi),1.f,0.f,0.f); }
-        else if (side==1 && nearbySlotHandle()>=0 && elapsed_<refugeSlots_[nearbySlotHandle()].stopTime)
-        { glTranslatef(-.02f,.025f,-.09f); glRotatef(-15.f,0.f,1.f,0.f); }
-        glRotatef(180.f,0.f,1.f,0.f);
-        if (handMeshes_[side]) glCallList(handMeshes_[side]);
+        InteractionPoint pose{side==0?-.16f:.16f,-.12f+sway-crouchBlend_*.012f,-.31f};
+        float gripRotation=0.f,gripAmount=.5f*ballHoldBlend_;
+        if(heldHouse>=0)
+        {
+            const auto& ball=refugeBalls_[heldHouse][1];
+            const auto centre=safehouses_[heldHouse];
+            const auto at=toCamera({centre.col+.5f+ball.x,refugeUpperFloor+ball.y,centre.row+.5f+ball.z});
+            pose.x+=(at.x+(side==0?-.13f:.13f)-pose.x)*ballHoldBlend_;
+            pose.y+=(at.y-.035f-pose.y)*ballHoldBlend_;pose.z+=(at.z+.025f-pose.z)*ballHoldBlend_;
+            gripRotation=(side==0?-55.f:55.f)*ballHoldBlend_;gripAmount=.65f*ballHoldBlend_;
+        }
+        else if(throwClock_>0.f)
+        { const float follow=std::sin((.4f-throwClock_)/.4f*pi); pose.y+=.035f*follow;pose.z-=.16f*follow; }
+        if(side==1 && drinkClock_>0.f)
+        {
+            const float sip=std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
+            pose={.14f-.10f*sip,-.15f+.12f*sip,-.36f+.06f*sip};
+            gripRotation=-35.f*sip;gripAmount=.85f*std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
+        }
+        else if(side==1 && nearbySlotHandle()>=0)
+        {
+            const int house=nearbySlotHandle(); const auto& machine=refugeSlots_[house];
+            const float t=elapsed_-(machine.stopTime-2.f);
+            if(t>=0.f && t<1.3f && machine.actor==networkSelfSlot_)
+            {
+                const auto knob=toCamera(slotKnobPoint(safehouses_[house],elapsed_,machine.stopTime));
+                const float reach=t<.25f?interactionSmooth(t/.25f):t>1.f?1.f-interactionSmooth((t-1.f)/.3f):1.f;
+                pose.x+=(knob.x-.025f-pose.x)*reach; pose.y+=(knob.y-.015f-pose.y)*reach;pose.z+=(knob.z+.04f-pose.z)*reach;
+                gripRotation=25.f*reach;gripAmount=reach;
+            }
+        }
+        glPushMatrix();glTranslatef(pose.x,pose.y,pose.z);glRotatef(gripRotation,0.f,0.f,1.f);
+        if(side==1 && drinkClock_>0.f && drinkMesh_)
+        {
+            glPushMatrix();glTranslatef(-.035f,-.045f,-.035f);glScalef(.65f,.65f,.65f);
+            const float sip=std::sin(interactionSmooth((4.f-drinkClock_)/4.f)*pi);
+            glRotatef(-55.f*sip,1.f,0.f,0.f);
+            glBindTexture(GL_TEXTURE_2D,drinkTexture_);glColor3f(.65f,.80f,.87f);glCallList(drinkMesh_);
+            glColor3f(1.f,1.f,1.f);glBindTexture(GL_TEXTURE_2D,handTexture_);glPopMatrix();
+        }
+        glRotatef(35.f,1.f,0.f,0.f);glRotatef(180.f,0.f,1.f,0.f);
+        if(handOpen_[side] && handGrip_[side])
+        {
+            const auto& open=*handOpen_[side];const auto& grip=*handGrip_[side];
+            const float fingerBlend=std::clamp(gripAmount,0.f,1.f);
+            glBegin(GL_TRIANGLES);
+            for(const auto index:open.indices)
+            {
+                const auto& a=open.vertices[index];const auto& b=grip.vertices[index];
+                glTexCoord2fv(a.uv);
+                glNormal3f(a.normal[0]+(b.normal[0]-a.normal[0])*fingerBlend,a.normal[1]+(b.normal[1]-a.normal[1])*fingerBlend,a.normal[2]+(b.normal[2]-a.normal[2])*fingerBlend);
+                glVertex3f(a.position[0]+(b.position[0]-a.position[0])*fingerBlend,a.position[1]+(b.position[1]-a.position[1])*fingerBlend,a.position[2]+(b.position[2]-a.position[2])*fingerBlend);
+            }
+            glEnd();
+        }
+        else if (handMeshes_[side]) glCallList(handMeshes_[side]);
         glPopMatrix();
     }
     glDisable(GL_TEXTURE_2D); glLightModelfv(GL_LIGHT_MODEL_AMBIENT,ambient); glEnable(GL_FOG);
@@ -2527,7 +2640,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     else if (puzzle_.stoneKind == StonePuzzleKind::Balance)
         objective_.setString("LIGHT STONES TO TOTAL " + std::to_string(puzzle_.balanceTarget) + "   /   E TO TOGGLE");
     else objective_.setString("TOUCH THE STONES IN ORDER   /   " + std::to_string(solved_) + "/3");
-    objective_.setPosition({ 24.f, static_cast<float>(viewport_.y) - 103.f }); target.draw(objective_);
+    objective_.setPosition({ 24.f, static_cast<float>(viewport_.y) - 103.f }); if(safehouseAt(game.player,safehouses_)<0) target.draw(objective_);
     if (inscriptionRead_)
     {
         std::string journal = puzzle_.stoneKind == StonePuzzleKind::Balance ? "GATE ORDER  " : "SEQUENCE  ";
@@ -2541,7 +2654,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             if (activeStones_ & (1u << stone)) journal += "*";
         }
         journal_.setString(journal);
-        journal_.setPosition({ 24.f, static_cast<float>(viewport_.y) - 76.f }); target.draw(journal_);
+        journal_.setPosition({ 24.f, static_cast<float>(viewport_.y) - 76.f }); if(safehouseAt(game.player,safehouses_)<0) target.draw(journal_);
     }
     hint_.setString("WASD move | Mouse look | Shift run | E open/use | T rays | M sound | B motion");
     hint_.setPosition({ 24.f, static_cast<float>(viewport_.y) - 45.f }); target.draw(hint_);
@@ -2561,6 +2674,11 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         {
             feedback_.setString(notice_); feedback_.setPosition({ 24.f, 134.f }); target.draw(feedback_);
         }
+    }
+    else if(nearbyBar()>=0)
+    {
+        feedback_.setString(seatedHouse_>=0?"BAR / E drink / Q stand":"BAR / E sit and drink");
+        feedback_.setPosition({24.f,78.f});target.draw(feedback_);
     }
     else if (nearbySlotHandle() >= 0)
     {

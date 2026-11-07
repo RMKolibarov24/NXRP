@@ -82,3 +82,19 @@ provide the visual evidence; process/window metadata confirms the package launch
 GitHub independently confirmed open PR #6 uses aleksandarkolev-st/NXRP,
 feature/the-hedge, at b483737. The following documentation-only receipt commit
 does not change the packaged game binary or its source version record.
+
+
+## Physical interaction fixes (current)
+
+Protocol 10: seated stance and slot actor are synchronized. Sourced stool and
+vessel accompany visible sitting/sipping. Source-skeleton finger curl blends
+into basketball hold, lever grip and glass hold. Slot palm/knob share the exact
+trajectory function, including reach/pull/return timing. Basketball release has
+follow-through and a tested full scoring trajectory. Render reviews caught and
+fixed the former bar eye/counter scale and hand/lever occlusion issues.
+
+140 unit tests pass. Expanded co-op smoke covers guest bar seating, movement
+lock/Q stand, seated stance propagation, actor-specific slot state, finger mesh
+deformation, all sourced assets and existing gameplay. Interaction images are
+under build/bar-drinking.png, basketball-hands.png and slot-hand-contact.png.
+Final package and launch receipt follow after archive creation.

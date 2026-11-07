@@ -41,3 +41,8 @@ forearm triangles, UVs and `survivor.png` skin texture. No hand geometry is
 procedurally authored. The converter selects lowerarm/hand descendant bone
 weights, recentres the meshes, and runtime transforms animate camera sway,
 drinking and reaching for the slot handle. Regenerate with prepare_survivor.py.
+
+`hands-l-grip.nxm` and `hands-r-grip.nxm` retain the exact same source topology
+and UVs as the open hands. They bake additional rotations of the source finger
+joints using the original skin weights. Runtime interpolates open and closed
+positions/normals for basketball, vessel and lever contact, with no new geometry.

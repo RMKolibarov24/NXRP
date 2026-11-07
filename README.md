@@ -27,7 +27,7 @@ reach/drink interactions. The machine has mechanical reel sounds, a pull clank
 and result cues; the bar has a glass clink. **E** at the bar restores breath and
 reduces fear, but its noise can draw the hunter into the house. The creature can
 force doors and follow players upstairs. Maze openings and closures now use
-irregular seeded delays rather than a fixed interval. Co-op protocol is **9**.
+irregular seeded delays rather than a fixed interval. Co-op protocol is **10**.
 
 A packaged build includes assets and app-local Windows runtime libraries. Extract
 the entire ZIP and launch `Play.cmd`. See [the quick play guide](docs/PLAY.md).
@@ -61,3 +61,9 @@ Settings persist the maze dimensions under `%LOCALAPPDATA%\NXRP\settings.txt`; s
 ## Project structure
 
 `Maze.Data` owns the grid and session state, `Maze.Logic` generates seeded mazes and maintains session rules, and `Maze.Graphics` contains the SFML application and first-person OpenGL view. `Maze.UnitTest` covers grid and session rules and seeded puzzle placement. The archived QA evidence predates the first-person systems.
+
+The bar has a specific **E sit and drink** prompt; **Q** or **Space** stands up.
+A downloaded stool and vessel support the sitting/sipping animation. Hands blend
+source-skeleton finger curl for carrying a basketball and gripping the glass or
+lever. The lever waits for reach, then the hand follows its actual knob trajectory
+through pull and return. Walking is briefly locked during lever contact.

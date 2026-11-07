@@ -252,6 +252,16 @@ int main()
     first.gameView_.elevation_=0.f; first.gameView_.stamina_=.2f;
     hv.stamina_=.3f; first.sendPlayer(); pump(20); sendKey(first,'E');
     assert(hv.drinks_[first.networkSlot_]==1 && first.gameView_.stamina_==1.f);
+    assert(first.gameView_.seatedHouse_==0);
+    first.sendPlayer();pump(20);
+    assert(hv.remote_[first.networkSlot_].seated && second.gameView_.remote_[first.networkSlot_].seated);
+    const float seatX=first.gameView_.x_,seatZ=first.gameView_.z_;
+    GameInput seatedWalk; seatedWalk.forward=1.f;
+    first.gameView_.update(first.game_,.05f,seatedWalk);
+    assert(first.gameView_.x_==seatX && first.gameView_.z_==seatZ);
+    sf::Event::KeyPressed stand; stand.code=sf::Keyboard::Key::Q;
+    first.gameView_.handleEvent(sf::Event{stand},first.game_);
+    assert(first.gameView_.seatedHouse_==-1);
     assert(hv.stamina_==.3f && hv.refugeNoise_[0]>0.f);
     sendKey(first,'E'); assert(hv.drinks_[first.networkSlot_]==1);
     second.gameView_.x_=first.gameView_.x_; second.gameView_.z_=first.gameView_.z_;
@@ -274,9 +284,9 @@ int main()
     for (int i=0;i<30;++i) hv.update(host.game_,.05f,stairWalk);
     assert(hv.elevation_ < .01f);
     // A complete pickup/throw arc can score; scoring isn't just a HUD command.
-    hv.x_ = gamesHouse.col + .5f - .55f; hv.z_ = gamesHouse.row + .5f - .713f;
+    hv.x_ = gamesHouse.col + .5f - .55f; hv.z_ = gamesHouse.row + .5f - .993f;
     hv.elevation_ = refugeUpperFloor; hv.angle_ = 0.f;
-    basket.x = -.55f; basket.z = -.713f; basket.y = .13f; basket.carrier = -1;
+    basket.x = -.55f; basket.z = -.993f; basket.y = .13f; basket.carrier = -1;
     basket.vx = basket.vy = basket.vz = 0.f;
     hv.playRefugeBall(true, 0); assert(basket.carrier == 0);
     hv.updateRefugeGames(.01f); hv.playRefugeBall(true, 0);
@@ -373,6 +383,40 @@ int main()
     for(unsigned y=165;y<340;++y) for(unsigned x=170;x<420;++x)
         if(reelA.getPixel({x,y})!=reelB.getPixel({x,y})) ++changedReelPixels;
     assert(changedReelPixels>20);
+    assert(hv.barStoolMesh_ && hv.drinkMesh_ && hv.drinkTexture_);
+    const auto knobRest=slotKnobPoint(renderHouse,0.f,2.f);
+    const auto knobPulled=slotKnobPoint(renderHouse,.65f,2.f);
+    assert(knobPulled.z<knobRest.z-.08f && knobPulled.y<knobRest.y);
+    hv.sitAtBar(0); hv.seatedBlend_=1.f; hv.drinkClock_=2.f;
+    hv.draw(refugeTarget,host.game_);refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/bar-drinking.png"));
+    hv.seatedHouse_=-1;hv.seatedBlend_=0.f;hv.drinkClock_=0.f;
+    hv.crouched_=false;hv.jumpHeight_=0.f;hv.pitch_=0.f;hv.bobBlend_=0.f;hv.ballHoldBlend_=1.f;hv.crouchBlend_=0.f;hv.elevation_=refugeUpperFloor;hv.x_=renderHouse.col+.5f-.55f;hv.z_=renderHouse.row+.5f-.5f;hv.angle_=0.f;
+    hv.refugeBalls_[0][1].carrier=0;hv.updateRefugeGames(.01f);
+    hv.draw(refugeTarget,host.game_);refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/basketball-hands.png"));
+    hv.heldBallLast_=true;hv.playRefugeBall(true,0);
+    hv.update(host.game_,.05f,GameInput{});
+    assert(hv.throwClock_>0.f && hv.refugeBalls_[0][1].carrier==-1);
+    hv.draw(refugeTarget,host.game_);refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/basketball-release.png"));
+    for(int side=0;side<2;++side)
+    {
+        assert(hv.handOpen_[side] && hv.handGrip_[side]);
+        const auto& open=*hv.handOpen_[side];const auto& grip=*hv.handGrip_[side];
+        std::size_t changed=0;
+        for(std::size_t vertex=0;vertex<open.vertices.size();++vertex)
+            if(std::abs(open.vertices[vertex].position[0]-grip.vertices[vertex].position[0])+
+               std::abs(open.vertices[vertex].position[1]-grip.vertices[vertex].position[1])+
+               std::abs(open.vertices[vertex].position[2]-grip.vertices[vertex].position[2])>.0001f) ++changed;
+        assert(changed>100);
+    }
+    hv.refugeBalls_[0][1].carrier=-1;hv.ballHoldBlend_=0.f;hv.elevation_=0.f;
+    const auto restKnob=slotKnobPoint(renderHouse,0.f,2.f);
+    hv.alignSlotView(0);
+    hv.refugeSlots_[0].actor=0;hv.refugeSlots_[0].stopTime=hv.elapsed_+1.35f;
+    hv.draw(refugeTarget,host.game_);refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/slot-hand-contact.png"));
     std::cout << "Screen-space ray tracing active: " << hv.rayTracingActive() << "\n";
     std::cout << "Four-player joins, capacity, both puzzles, refuges, captures, shifting, reconnect, and victory passed.\n";
 }

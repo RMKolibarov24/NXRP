@@ -124,3 +124,14 @@ if __name__ == '__main__':
     convert(Path('build/asset-sources/bar-counter.glb'),'bar',
         [('counter',['bar-counter-module_'+str(i) for i in range(5)])],.90)
 
+
+    cup = GLTF2().load('build/asset-sources/tumbler.glb')
+    convert(Path('build/asset-sources/tumbler.glb'),'drink',
+        [('cup',[n.name for n in cup.nodes if n.mesh is not None])],.14)
+    # Reposition the downloaded stool for the bar; retain its original triangles.
+    stool=Path('assets/models/slots-stool.nxm').read_bytes()
+    count,indices=struct.unpack('<II',stool[4:12])
+    vertices=np.frombuffer(stool[12:12+count*32],dtype='<f4').reshape(-1,8).copy()
+    low,high=vertices[:,:3].min(0),vertices[:,:3].max(0)
+    vertices[:,:3]-=np.array([(low[0]+high[0])/2,low[1],(low[2]+high[2])/2])
+    Path('assets/models/bar-stool.nxm').write_bytes(stool[:12]+vertices.tobytes()+stool[12+count*32:])

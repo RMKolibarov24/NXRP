@@ -166,7 +166,7 @@ void Menu::resize(sf::Vector2u size)
         "The creature sees and hears you. Caught? Your progress stays.\n"
         "E opens doors. The hunter can force them and climb stairs.\n"
         "Upstairs: G picks up/throws basketball; K kicks football.\n"
-        "E uses slot handles or bar. Noise attracts the hunter.\n"
+        "E pulls handles or sits/drinks at bar; Q stands. Noise attracts.\n"
         "F collects notes; J rereads. Repeated noise sharpens its hearing.\n"
         "The hedge shifts. T toggles ray-traced light; B head motion; M sound.\n"
         "Esc pauses; R restarts this maze.\n"

@@ -136,7 +136,7 @@ def main():
         for child in node.children or []:
             parents[child] = index
 
-    def pose_at(time):
+    def pose_at(time, grip=0.0):
         trs = [[np.array(n.translation or [0, 0, 0], dtype=float),
                 np.array(n.rotation or [0, 0, 0, 1], dtype=float),
                 np.array(n.scale or [1, 1, 1], dtype=float)] for n in model.nodes]
@@ -150,6 +150,13 @@ def main():
                      + (-2*t**3+3*t**2)*v1 + (t**3-t**2)*tangent1)
             part = {'translation': 0, 'rotation': 1, 'scale': 2}[path]
             trs[node][part] = value / max(np.linalg.norm(value), 1e-12) if part == 1 else value
+        if grip:
+            for i,node in enumerate(model.nodes):
+                if not any((node.name or '').startswith(finger+'_') for finger in ('index','middle','ring','pinky','thumb')):continue
+                bend=(.30 if node.name.startswith('thumb') else .65 if '_01_' in node.name else .85)*grip
+                q=trs[i][1]; v=q[:3]; w=q[3]
+                axis=np.array([np.sin(bend/2),0.,0.]); scalar=np.cos(bend/2)
+                trs[i][1]=np.r_[w*axis+scalar*v+np.cross(v,axis),w*scalar-np.dot(v,axis)]
         local = [matrix(node, *trs[i]) for i, node in enumerate(model.nodes)]
         world = [None] * len(local)
         def global_matrix(i):
@@ -190,6 +197,19 @@ def main():
         for p, n in frames:
             p[:, 1] -= floor; p *= 1.18 / height
             out.write(np.concatenate((p, n), axis=1).astype('<f4').tobytes())
+    grip_poses=[]
+    for time in (0.,duration/4):
+        bones=pose_at(time,1.)
+        p=np.zeros((len(positions),3));n=np.zeros_like(p)
+        for influence in range(4):
+            matrices=bones[joints[:,influence]];weight=weights[:,influence,None]
+            p+=np.einsum('nij,nj->ni',matrices[:,:3,:],homogeneous)*weight
+            n+=np.einsum('nij,nj->ni',matrices[:,:3,:3],normals)*weight
+        grip_poses.append((p,n))
+    grip_p=(grip_poses[0][0]+grip_poses[1][0])*.5
+    grip_p[:,1]-=floor;grip_p*=1.18/height
+    grip_n=(grip_poses[0][1]+grip_poses[1][1])*.5
+    grip_n/=np.maximum(np.linalg.norm(grip_n,axis=1,keepdims=True),1e-12)
     # Extract original skinned forearms/hands for the first-person view. Keep
     # source triangles and UVs; this is mesh selection, never authored geometry.
     for side in ('l', 'r'):
@@ -214,6 +234,10 @@ def main():
         with (args.output / ('hands-' + side + '.nxm')).open('wb') as out:
             out.write(b'NXM1'+struct.pack('<II',len(vertices),len(inverse)))
             out.write(vertices.tobytes()); out.write(inverse.astype('<u4').tobytes())
+        grip_vertices=np.concatenate((grip_p[used]-origin,grip_n[used],uvs[used]),axis=1).astype('<f4')
+        with (args.output / ('hands-' + side + '-grip.nxm')).open('wb') as out:
+            out.write(b'NXM1'+struct.pack('<II',len(grip_vertices),len(inverse)))
+            out.write(grip_vertices.tobytes());out.write(inverse.astype('<u4').tobytes())
         print(f'Extracted source hand {side}: {len(vertices)} vertices, bounds {hand_p.min(0)} to {hand_p.max(0)}')
     print(f'Prepared {len(positions):,} vertices, {len(triangles)//3:,} triangles and {len(frames)} animated frames')
 

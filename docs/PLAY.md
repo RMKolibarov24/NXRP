@@ -14,7 +14,7 @@ face the hoop before throwing. K kicks the football in the direction you face.
 Goals and baskets reset the ball and update shared scores. Balls stay upstairs.
 
 Downstairs, face the slot-cabinet handle at close range and press E to pull. The monster can hear the reels.
-Three matching reel symbols are a jackpot; play is free. E at the bar restores breath, but clinking glass attracts the hunter. Closed doors only delay it. F collects keeper notes
+Three matching reel symbols are a jackpot; play is free. E at the bar seats you and lifts a glass to drink, restoring breath. E drinks again after the cooldown; Q or Space stands up. Clinking glass attracts the hunter. Closed doors only delay it. F collects keeper notes
 inside refuges; J cycles collected notes. Puzzle clues and notes survive captures.
 Restart clears the run, sports scores, slots and notes.
 
@@ -30,3 +30,8 @@ shared doors, puzzles, balls, slots and the hunter. Host pause pauses the world.
 
 Asset attribution is included in assets/models/README.md,
 assets/textures/README.md and assets/fonts/README.md.
+
+The hands close around carried basketballs, open with throw follow-through, and
+reach to the model's actual lever knob during its pull. Hold interactions briefly
+lock walking; the bar has a visible stool and a specific sit/drink prompt.
+All co-op players need this protocol-10 build for seated stance and handle actors.

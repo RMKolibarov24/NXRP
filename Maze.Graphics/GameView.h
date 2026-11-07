@@ -11,6 +11,7 @@
 #include "Maze.Soundscape.h"
 #include "Maze.Puzzle.h"
 #include "Maze.Safehouse.h"
+#include "Maze.CreatureMesh.h"
 
 struct GameInput
 {
@@ -27,7 +28,7 @@ struct RemotePlayer
     bool moving = false, running = false, present = false;
     float elevation = 0.f;
     float jumpHeight = 0.f;
-    bool crouched = false;
+    bool crouched = false, seated = false;
 };
 
 struct SafehouseDoor
@@ -40,6 +41,7 @@ struct SafehouseDoor
 struct RefugeSlots
 {
     unsigned spins = 0;
+    int actor = 0;
     float stopTime = 0.f;
     std::array<int, 3> symbols{};
 };
@@ -98,7 +100,10 @@ private:
     int nearbyShrine() const;
     int nearbyDoor() const;
     int nearbySlotHandle() const;
+    int nearbyBar() const;
+    void sitAtBar(int house);
     void pullSlotHandle(const GameState& game);
+    void alignSlotView(int house);
     bool nearGate(const GameState& game) const;
     bool nearInscription() const;
     void resetHunter(const GameState& game);
@@ -137,8 +142,10 @@ private:
     std::array<unsigned int, 4> refugePropMeshes_{};
     std::array<std::array<unsigned int,4>,3> reelMeshes_{};
     unsigned int slotsTexture_ = 0, barTexture_ = 0;
+    unsigned int barStoolMesh_ = 0, drinkMesh_ = 0, drinkTexture_ = 0;
     bool refugePropsAttempted_ = false;
     std::array<unsigned int,2> handMeshes_{};
+    std::array<std::optional<CreatureMesh>,2> handOpen_{}, handGrip_{};
     unsigned int handTexture_ = 0;
     bool handsAttempted_ = false;
     unsigned int creatureMesh_ = 0, creatureTexture_ = 0;
@@ -185,6 +192,9 @@ private:
     float shiftDelay_ = 14.f;
     std::vector<float> refugeNoise_;
     float drinkClock_ = 0.f;
+    int seatedHouse_ = -1;
+    float seatedBlend_ = 0.f, ballHoldBlend_ = 0.f, throwClock_ = 0.f;
+    bool heldBallLast_ = false;
     std::array<float, maxCoopPlayers> drinkCooldowns_{};
     std::array<std::uint32_t, maxCoopPlayers> drinks_{};
     std::uint32_t seenDrink_ = 0;
