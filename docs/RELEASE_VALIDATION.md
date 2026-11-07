@@ -113,3 +113,20 @@ GitHub independently confirmed PR #6 uses the fork aleksandarkolev-st/NXRP and
 head 1e7bdf4. Following receipt-only documentation commits do not change the
 packaged game binary. Final expanded smoke passes actual throw release and
 follow-through plus all earlier gameplay checks; 140 unit tests pass.
+
+## Smooth slots checkpoint (2026-11-08)
+
+Source 5767a15338c7d44c9e23ca47298b10f5db720641 is pushed to the fork branch
+feeding PR #6. Exact committed source was built in an isolated worktree at
+build/slot-motion-source. Graphics and CoopSmoke Release/x64 builds pass;
+the real four-player TCP smoke passes, including lever phase-boundary continuity,
+grip/contact timing, monotonic deceleration and exact reel endpoints.
+
+Package: build/slot-motion-source/build/packages/TheHedge-Smooth-Slots-Windows-x64.zip
+Size: 28,993,619 bytes. SHA256:
+5772F0B4AFD4C7B27A5FB38CB6FA08D93EAAA682D4419608D14F6A65CD9CE70A.
+VERSION records source 5767a15 and co-op protocol 10. The matching packaged
+executable was launched visibly as PID 34880, title NXRP - The Hedge,
+Responding True, nonzero window handle 5572590. Left open for play.
+This is the slot animation checkpoint; broader realism/voice/poker work remains
+unfinished and is excluded from this package and commit.
