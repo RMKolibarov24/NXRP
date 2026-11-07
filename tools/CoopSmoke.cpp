@@ -18,6 +18,7 @@
 #include "MazeApplication.h"
 #undef private
 #include "Maze.Game.h"
+#include "VoicePacket.h"
 #include "GameView.cpp"
 #include "MazeApplication.cpp"
 
@@ -68,6 +69,22 @@ int main()
     for (int step = 100; step >= 0; --step)
         stairHeight = refugeFloorHeight(4.5f + .98f * refugeScale, 4.5f + refugeScale * (.30f + .85f * step / 100.f), stairHeight, refugeProbe);
     assert(stairHeight < .001f);
+    // Voice framing is bounded, independently decodable and rejects malformed input.
+    VoicePacket voice;voice.generation=3;voice.actor=2;voice.sequence=7;
+    for(std::size_t sample=0;sample<voiceSamples;++sample)
+    {
+        const auto pcm=static_cast<std::int16_t>(std::sin(sample*.12)*12000.);
+        voice.samples[sample]=voiceEncodeSample(pcm);
+        assert(std::abs(static_cast<int>(voiceDecodeSample(voice.samples[sample]))-pcm)<1024);
+    }
+    VoicePacket decoded;assert(parseVoice(serializeVoice(voice),decoded));
+    assert(decoded.samples==voice.samples && decoded.actor==2 && decoded.sequence==7 && voiceLevel(decoded)>.1f);
+    const auto unchanged=decoded.samples;
+    assert(!parseVoice("V 3 9 7 00",decoded));
+    assert(!parseVoice("V -1 2 7 "+std::string(640,'0'),decoded));
+    assert(!parseVoice("V 3 2 7 "+std::string(640,'z'),decoded));
+    assert(!parseVoice(serializeVoice(voice)+" extra",decoded));
+    assert(decoded.samples==unchanged);
     sf::Font font; assert(font.openFromFile("assets/fonts/SourceSans3-Semibold.ttf"));
     sf::RenderWindow window(sf::VideoMode({640, 560}), "Co-op smoke test"); window.setVisible(false);
     Menu menu(font); menu.resize({640,560});
@@ -87,6 +104,8 @@ int main()
     constexpr std::uint16_t testPort = 24817; // Do not interrupt a game hosted on 24816.
     MazeApplication host(font, ""), first(font, ""), second(font, ""), third(font, ""), extra(font, "");
     std::array<MazeApplication*, 4> guests{ &first, &second, &third, &extra };
+    host.voice_.setDevicesEnabled(false);
+    for(auto* guest:guests)guest->voice_.setDevicesEnabled(false);
     host.game_.selectedSeed = 42; host.beginNewGame();
     host.networkRole_ = MazeApplication::NetworkRole::Host; host.networkGeneration_ = 1;
     host.gameView_.update(host.game_, .01f, GameInput{}); host.network_.host(testPort);
@@ -115,6 +134,32 @@ int main()
             assert(guest.gameView_.remote_[slot].present == (slot != guest.networkSlot_));
     }
     assert(host.gameView_.playerCount() == 4);
+    // Synthetic speech traverses actual host relay; device I/O remains disabled.
+    VoicePacket speech=voice;speech.generation=1;speech.actor=3;speech.sequence=10;
+    assert(first.network_.send(serializeVoice(speech)));pump(30);
+    assert(host.voiceReceived_[1]==1 && second.voiceReceived_[1]==1 && third.voiceReceived_[1]==1);
+    assert(host.voiceReceived_[3]==0); // Claimed actor 3 was replaced by peer 1.
+    assert(first.voiceReceived_[1]==0); // No self echo.
+    assert(host.gameView_.voiceNoiseTime_[1]>0.f);
+    assert(first.network_.send(serializeVoice(speech)));pump(20);
+    assert(host.voiceReceived_[1]==1); // Replay rejected.
+    ++speech.sequence;speech.generation=99;
+    assert(first.network_.send(serializeVoice(speech)));pump(20);assert(host.voiceReceived_[1]==1);
+    speech.generation=1;++speech.sequence;
+    second.mutedVoices_|=1u<<1;
+    assert(first.network_.send(serializeVoice(speech)));pump(20);
+    assert(host.voiceReceived_[1]==2 && second.voiceReceived_[1]==1 && third.voiceReceived_[1]==2);
+    second.mutedVoices_=0;
+    const float nearX=third.gameView_.x_,nearZ=third.gameView_.z_;
+    third.gameView_.x_=host.game_.maze.size().cols-.5f;third.gameView_.z_=host.game_.maze.size().rows-.5f;third.sendPlayer();pump(20);
+    ++speech.sequence;assert(first.network_.send(serializeVoice(speech)));pump(20);
+    assert(third.voiceReceived_[1]==2); // Host culls out-of-range recipients.
+    third.gameView_.x_=nearX;third.gameView_.z_=nearZ;third.sendPlayer();pump(20);
+    const auto beforeFlood=host.voiceReceived_[1];host.voiceTokens_[1]=2.f;
+    for(unsigned frame=100;frame<130;++frame)
+    {speech.sequence=frame;host.receiveVoice(serializeVoice(speech),1);}
+    assert(host.voiceReceived_[1]==beforeFlood+2 && host.voiceTokens_[1]==0.f);
+    pump(20); // Rate-excess speech cannot consume unbounded relay capacity.
     join(extra); pump(100);
     assert(extra.networkRole_ == MazeApplication::NetworkRole::Solo);
     assert(extra.menu_.notice_.find("four players") != std::string::npos);
@@ -340,25 +385,34 @@ int main()
     assert(hv.remote_[first.networkSlot_].crouched && second.gameView_.remote_[first.networkSlot_].crouched);
     first.gameView_.crouched_=false;
     // The hunter follows the physical staircase up, then descends when abandoned.
+    for(auto& player:hv.remote_)player.present=false;
     hv.interiorHunter_=false; hv.hunterY_=0.f;
     hv.monster_=hv.monsterFrom_=gamesHouse; hv.hunter_.cell=gamesHouse;
-    hv.hunter_.mode=HunterMode::Chase;
+    hv.hunter_.mode=HunterMode::Patrol;hv.hunter_.memory=0;
     hv.x_=gamesHouse.col+.5f-.55f; hv.z_=gamesHouse.row+.5f-.5f;
     hv.elevation_=refugeUpperFloor; hv.jumpHeight_=0.f;
-    for(int i=0;i<400 && hv.interiorPhase_!=4;++i) hv.updateInteriorHunter(.05f);
+    hv.updateInteriorHunter(host.game_,.05f);
+    assert(!hv.interiorHunter_); // Silent players cannot be seen through the floor.
+    const HunterTarget upstairsNoise{{static_cast<int>(hv.z_),static_cast<int>(hv.x_)},true,true,12,false,false,refugeUpperFloor};
+    advanceHunterGroup(host.game_.maze,hv.hunter_,&upstairsNoise,1,hv.safehouses_,~hv.doorMask());
+    assert(hv.hunter_.mode==HunterMode::Search && hv.hunter_.lastKnownElevation==refugeUpperFloor);
+    for(int i=0;i<400 && hv.interiorPhase_!=4;++i) hv.updateInteriorHunter(host.game_,.05f);
     assert(hv.interiorHunter_ && hv.interiorPhase_==4 && hv.hunterY_==refugeUpperFloor);
-    for(int i=0;i<100;++i) hv.updateInteriorHunter(.05f);
+    for(int i=0;i<100;++i) hv.updateInteriorHunter(host.game_,.05f);
     assert(std::abs(hv.hunterX_-hv.x_)<.01f && std::abs(hv.hunterZ_-hv.z_)<.01f);
     hv.elevation_=0.f;
     for(auto& player:hv.remote_) player.present=false;
-    for(int i=0;i<400 && hv.interiorHunter_;++i) hv.updateInteriorHunter(.05f);
-    assert(!hv.interiorHunter_ && hv.hunterY_==0.f);
+    hv.initialized_=false; // No fresh sightings or sounds while the trail expires.
+    for(int i=0;i<400 && hv.interiorHunter_;++i) hv.updateInteriorHunter(host.game_,.05f);
+    assert(!hv.interiorHunter_ && hv.hunterY_==0.f && hv.hunter_.mode==HunterMode::Patrol);
+    hv.updateInteriorHunter(host.game_,.05f);assert(!hv.interiorHunter_);
+    hv.initialized_=true;
     // Closed doors delay entry, then the hunter forces the actual doorway.
     hv.x_=gamesHouse.col+.5f; hv.z_=gamesHouse.row+.5f; hv.elevation_=0.f;
     host.game_.player=gamesHouse; hv.elapsed_=13.f;
     hv.monster_=hv.monsterFrom_={gamesHouse.row,gamesHouse.col-3};
     hv.hunter_.cell=hv.monster_; hv.hunter_.previous={gamesHouse.row,gamesHouse.col-4};
-    hv.hunter_.mode=HunterMode::Chase; hv.monsterClock_=0.f;
+    hv.hunter_.mode=HunterMode::Chase; hv.monsterClock_=0.f;hv.refugeNoise_[0]=5.f;
     hv.doors_[0][0].open=false; hv.doors_[0][0].swing=0.f; hv.doorStrikes_.fill(0);
     bool enteredHouse=false;
     for(int i=0;i<8 && !enteredHouse;++i)
@@ -371,9 +425,11 @@ int main()
     hv.interiorHunter_=true; hv.interiorHouse_=0; hv.interiorPhase_=4;
     hv.hunterX_=hv.x_; hv.hunterZ_=hv.z_; hv.hunterY_=refugeUpperFloor;
     hv.elevation_=refugeUpperFloor; hv.elapsed_=13.f;
+    hv.hunter_.routes[0]={{4,4},{4,5},3};
     const auto beforeUpperCapture=hv.captureCount_;
     hv.updateMonster(host.game_,.01f,false,false);
     assert(hv.captureCount_==beforeUpperCapture+1);
+    assert(hv.hunter_.routes[0].confidence==3 && hv.hunter_.routes[0].exit.col==5);
     Multiplayer unavailable; unavailable.join("127.0.0.1", 1);
     for (int i=0; i<400 && unavailable.status()==Multiplayer::Status::Connecting; ++i)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));

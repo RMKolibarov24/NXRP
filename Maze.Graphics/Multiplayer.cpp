@@ -16,6 +16,7 @@ namespace
     bool nonblocking(SOCKET socket)
     {
         u_long enabled = 1;
+        const int noDelay=1;setsockopt(socket,IPPROTO_TCP,TCP_NODELAY,reinterpret_cast<const char*>(&noDelay),sizeof(noDelay));
         return ioctlsocket(socket, FIONBIO, &enabled) == 0;
     }
 
@@ -58,7 +59,7 @@ bool Multiplayer::send(std::string message, int peer)
         message.empty() || message.size() > maxMessage || message.find_first_of("\r\n") != std::string::npos) return false;
     message.push_back('\n');
     std::lock_guard<std::mutex> lock(mutex_);
-    if (outgoingBytes_ + message.size() > maxQueued) return false;
+    if (outgoingBytes_ + message.size() > maxQueued || (message.rfind("V ",0)==0 && outgoingBytes_>8192)) return false;
     outgoingBytes_ += message.size();
     outgoing_.push_back({ MultiplayerMessage::Kind::Data, peer, std::move(message), peerGeneration_[peer].load() });
     return true;
@@ -160,6 +161,9 @@ void Multiplayer::run(bool hosting, std::string host, std::uint16_t port)
         {
             auto& peer = peers[message.peer];
             if (peer.socket == INVALID_SOCKET || message.generation != peer.generation) continue;
+            // Speech is disposable. Keep it from filling a slow peer's queue
+            // ahead of player/world updates or causing a gameplay disconnect.
+            if(message.text.rfind("V ",0)==0 && peer.queuedBytes>4096)continue;
             if (peer.queuedBytes + message.text.size() > maxQueued) { drop(message.peer); continue; }
             peer.queuedBytes += message.text.size(); peer.pending.push_back(std::move(message.text));
         }

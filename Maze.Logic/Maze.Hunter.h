@@ -8,6 +8,12 @@
 
 enum class HunterMode { Patrol, Search, Chase };
 
+struct HunterRoute
+{
+    MazePosition junction{-1,-1},exit{-1,-1};
+    unsigned confidence=0;
+};
+
 struct HunterState
 {
     MazePosition cell{};
@@ -17,6 +23,11 @@ struct HunterState
     int memory = 0;
     unsigned vigilance = 0;
     std::uint32_t random = 1;
+    float elevation=0.f,lastKnownElevation=0.f;
+    MazePosition searchGoal{-1,-1}, observed{-1,-1};
+    int observedActor=-1,linger=0;
+    bool searchingArea=false;
+    std::array<HunterRoute,24> routes{};
 };
 
 struct HunterTarget
@@ -26,7 +37,15 @@ struct HunterTarget
     bool running = false;
     int noise = 0;
     bool crouched = false;
+    bool audibleOnly = false;
+    float elevation = 0.f;
 };
+
+// 2 = an actual sighting, 1 = audible evidence, 0 = no information.
+// Shared by grid pursuit and continuous movement inside two-storey refuges.
+int senseHunterTarget(const MazeGrid& maze,const HunterState& hunter,
+    const HunterTarget& target,const std::vector<MazePosition>& safehouses={},
+    unsigned closedDoors=0);
 
 // Select a reproducible patrol start away from the entrance, gate, stones and
 // a temporary opening. The encounter number varies the start after a capture.
@@ -49,7 +68,7 @@ void advanceHunterCoop(const MazeGrid& maze, HunterState& hunter,
 // Examines every player before selecting the strongest visible or audible target.
 void advanceHunterGroup(const MazeGrid& maze, HunterState& hunter,
     const HunterTarget* targets, std::size_t count,
-    const std::vector<MazePosition>& safehouses = {});
+    const std::vector<MazePosition>& safehouses = {}, unsigned closedDoors = 0);
 
 // Reposition an unseen, distant hunter near the group on very large maps.
 // Never selects a refuge, a stone, or a cell within 14 units of any player.

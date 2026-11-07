@@ -2,6 +2,7 @@
 
 #include "GameView.h"
 #include "Soundscape.h"
+#include "VoiceChat.h"
 #include "Multiplayer.h"
 #include "menu.h"
 
@@ -34,10 +35,21 @@ private:
     void updateTime(Clock::time_point now);
     void updateNetwork(float seconds);
     void sendPlayer();
+    void receiveVoice(const std::string& message,int peer);
+    void transmitVoice(VoicePacket packet);
+    void playVoice(const VoicePacket& packet);
+    void updateVoice(sf::RenderWindow& window);
     void endNetwork();
 
     bool mouseCaptured_ = false;
     Soundscape soundscape_;
+    VoiceChat voice_;
+    bool voiceEnabled_=true;
+    unsigned mutedVoices_=0,voiceGeneration_=0;
+    std::array<std::uint32_t,4> voiceSequence_{};
+    std::array<bool,4> voiceSequenceSeen_{};
+    std::array<float,4> voiceTokens_{{6.f,6.f,6.f,6.f}},voiceSpeaking_{};
+    std::array<unsigned,4> voiceReceived_{};
     Multiplayer network_;
     enum class NetworkRole { Solo, Host, Guest } networkRole_ = NetworkRole::Solo;
     Multiplayer::Status networkStatus_ = Multiplayer::Status::Idle;

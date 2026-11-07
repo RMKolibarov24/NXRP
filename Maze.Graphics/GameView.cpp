@@ -1,5 +1,6 @@
 #include "GameView.h"
 #include "InteractionPose.h"
+#include "Maze.Acoustics.h"
 #include "Maze.Puzzle.h"
 #include "Maze.Atmosphere.h"
 #include "Maze.CreatureMesh.h"
@@ -385,7 +386,7 @@ namespace
 }
 
 GameView::GameView(const sf::Font& font)
-    : heading_(font, "THE HEDGE", 24), objective_(font, "", 19), journal_(font, "", 16), hint_(font, "", 17),
+    : voiceLabel_(font,"",12), heading_(font, "THE HEDGE", 24), objective_(font, "", 19), journal_(font, "", 16), hint_(font, "", 17),
       seedText_(font, "", 15), feedback_(font, "", 20), staminaLabel_(font, "BREATH", 14), soundLabel_(font, "", 14)
 {
     heading_.setFillColor({ 231, 226, 198 });
@@ -421,6 +422,7 @@ void GameView::initialize(GameState& game)
     bobPhase_ = bobBlend_ = sprintBlend_ = 0.f;
     darkness_ = hedgeDarkness(x_, z_, game.mazeSeed.value_or(0));
     shift_ = { -1, -1 }; shiftPhase_ = ShiftPhase::Idle; shiftProgress_ = 0.f; shiftCount_ = 0; captureCount_ = 0;
+    voiceNoiseTime_.fill(0.f);voiceNoiseLevel_.fill(0.f);
     remoteCaptures_.fill(0); seenRemoteCaptures_ = 0; remoteCaptureCooldown_.fill(0.f);
     safehouses_ = generateSafehouses(game.maze.size(), game.mazeSeed.value_or(0));
     doors_.assign(safehouses_.size(), {});
@@ -779,8 +781,17 @@ void GameView::interact(GameState& game)
 void GameView::resetHunter(const GameState& game)
 {
     interiorHunter_=false; interiorHouse_=-1; hunterY_=0.f;
+    const auto routes=hunter_.routes;
+    const auto vigilance=hunter_.vigilance;
     hunter_ = makeHunter(game.maze, game.mazeSeed.value_or(0), captureCount_, shrines_, shift_, safehouses_);
+    if(captureCount_>0){hunter_.routes=routes;hunter_.vigilance=vigilance;}
     monster_ = hunter_.cell; monsterFrom_ = monster_;
+}
+
+void GameView::emitVoiceNoise(int slot,float level)
+{
+    if(slot<0 || slot>=maxCoopPlayers || !std::isfinite(level) || level<.01f) return;
+    voiceNoiseTime_[slot]=.35f;voiceNoiseLevel_[slot]=std::clamp(level,0.f,1.f);
 }
 
 RemotePlayer GameView::localPlayer() const noexcept
@@ -1002,31 +1013,47 @@ void GameView::handleRemoteEvent(int slot, const sf::Event& event, GameState& ga
     x_ = savedX; z_ = savedZ; angle_ = savedAngle; elevation_ = savedElevation; stamina_=savedStamina; fear_=savedFear; interactionSlot_=networkSelfSlot_;
 }
 
-void GameView::updateInteriorHunter(float seconds)
+void GameView::updateInteriorHunter(const GameState& game,float seconds)
 {
     const int house=interiorHunter_?interiorHouse_:safehouseAt(monster_,safehouses_);
-    if (house<0) return;
+    if(house<0)return;
     const auto centre=safehouses_[house];
-    RemotePlayer target; float nearest=1e9f;
-    for (int slot=0;slot<maxCoopPlayers;++slot)
+    if(!interiorHunter_)
     {
-        const auto player=slot==networkSelfSlot_?localPlayer():remote_[slot];
-        if (!player.present || player.elevation<1.5f || safehouseAt({static_cast<int>(player.z),static_cast<int>(player.x)},safehouses_)!=house) continue;
-        const float distance=(player.x-(centre.col+.5f))*(player.x-(centre.col+.5f))+(player.z-(centre.row+.5f))*(player.z-(centre.row+.5f));
-        if (distance<nearest) { target=player; nearest=distance; }
-    }
-    if (!interiorHunter_)
-    {
-        if (!target.present || hunter_.mode==HunterMode::Patrol) return;
+        if(hunter_.mode==HunterMode::Patrol || hunter_.memory<=0
+            || hunter_.lastKnownElevation<1.5f || safehouseAt(hunter_.lastKnown,safehouses_)!=house)return;
         const float blend=std::clamp(monsterClock_/monsterStepDuration_,0.f,1.f);
         hunterX_=monsterFrom_.col+.5f+(monster_.col-monsterFrom_.col)*blend;
         hunterZ_=monsterFrom_.row+.5f+(monster_.row-monsterFrom_.row)*blend;
-        // Finish crossing the doorway before changing to the stair route.
-        if (safehouseAt({static_cast<int>(hunterZ_),static_cast<int>(hunterX_)},safehouses_)!=house) return;
-        interiorHunter_=true; interiorHouse_=house; interiorPhase_=0; hunterY_=0.f;
+        if(safehouseAt({static_cast<int>(hunterZ_),static_cast<int>(hunterX_)},safehouses_)!=house)return;
+        interiorHunter_=true;interiorHouse_=house;interiorPhase_=0;hunterY_=0.f;
+        interiorGoalX_=hunter_.lastKnown.col+.5f;interiorGoalZ_=hunter_.lastKnown.row+.5f;
+        interiorGoalY_=hunter_.lastKnownElevation;interiorMemory_=12.f;
     }
-    if (!target.present && interiorPhase_<2) { interiorHunter_=false; hunterY_=0.f; return; }
-    if (!target.present && interiorPhase_==4) interiorPhase_=5;
+    HunterState observer=hunter_;observer.elevation=hunterY_;
+    observer.cell={static_cast<int>(hunterZ_),static_cast<int>(hunterX_)};
+    int strongest=0;float nearest=1e9f;
+    for(int slot=0;slot<maxCoopPlayers;++slot)
+    {
+        const auto player=playerAt(slot);
+        if(!player.present)continue;
+        const MazePosition at{static_cast<int>(player.z),static_cast<int>(player.x)};
+        const HunterTarget target{at,player.moving,player.running,
+            voiceNoiseTime_[slot]>0.f?std::clamp(static_cast<int>(2.f+voiceNoiseLevel_[slot]*30.f),4,12):player.jumpHeight>.01f?4:0,
+            player.crouched,false,player.elevation};
+        const int signal=senseHunterTarget(game.maze,observer,target,safehouses_,~doorMask());
+        const float distance=(player.x-hunterX_)*(player.x-hunterX_)+(player.z-hunterZ_)*(player.z-hunterZ_);
+        if(signal>strongest || (signal>0 && signal==strongest && distance<nearest))
+        {
+            strongest=signal;nearest=distance;
+            interiorGoalX_=signal==2?player.x:at.col+.5f;
+            interiorGoalZ_=signal==2?player.z:at.row+.5f;interiorGoalY_=player.elevation;
+            hunter_.lastKnown=at;hunter_.lastKnownElevation=player.elevation;
+        }
+    }
+    interiorMemory_=strongest>0?8.f:std::max(0.f,interiorMemory_-seconds);
+    // Follow remembered evidence, never the live position of a hidden player.
+    if(interiorPhase_==4 && (interiorMemory_<=0.f || interiorGoalY_<1.5f))interiorPhase_=5;
     const float hx=centre.col+.5f,hz=centre.row+.5f;
     float gx=hunterX_,gz=hunterZ_;
     switch(interiorPhase_)
@@ -1035,7 +1062,7 @@ void GameView::updateInteriorHunter(float seconds)
     case 1: gx=hx+.98f*refugeScale; gz=hz+.20f*refugeScale; break;
     case 2: gx=hx+.98f*refugeScale; gz=hz+1.16f*refugeScale; break;
     case 3: case 5: gx=hx+.45f*refugeScale; gz=hz+1.16f*refugeScale; break;
-    case 4: gx=std::min(target.x,hx+.60f*refugeScale); gz=target.z; break;
+    case 4: gx=std::min(interiorGoalX_,hx+.60f*refugeScale); gz=interiorGoalZ_; break;
     case 6: gx=hx+.98f*refugeScale; gz=hz+1.16f*refugeScale; break;
     case 7: gx=hx+.98f*refugeScale; gz=hz+.20f*refugeScale; break;
     }
@@ -1048,10 +1075,16 @@ void GameView::updateInteriorHunter(float seconds)
     }
     hunterY_=refugeFloorHeight(hunterX_,hunterZ_,hunterY_,safehouses_);
     hunter_.cell=monster_=monsterFrom_={static_cast<int>(hunterZ_),static_cast<int>(hunterX_)};
-    hunter_.mode=target.present?HunterMode::Chase:HunterMode::Search;
+    hunter_.mode=strongest==2?HunterMode::Chase:HunterMode::Search;
+    hunter_.elevation=hunterY_;
     if (distance<=step+.001f && interiorPhase_!=4)
     {
-        if(interiorPhase_==7) {interiorHunter_=false; interiorHouse_=-1; hunterY_=0.f;}
+        if(interiorPhase_==7)
+        {
+            interiorHunter_=false;interiorHouse_=-1;hunterY_=hunter_.elevation=0.f;
+            if(interiorMemory_<=0.f)
+            {hunter_.memory=0;hunter_.mode=HunterMode::Patrol;hunter_.lastKnownElevation=0.f;}
+        }
         else ++interiorPhase_;
     }
 }
@@ -1086,16 +1119,17 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
         const auto previousMode = hunter_.mode;
         std::array<HunterTarget, maxCoopPlayers + 4> targets{};
         std::size_t count = 0;
-        targets[count++] = { game.player, movementHeard_ && !crouched_, runningHeard_, jumpHeight_>.01f?4:0, crouched_ };
+        targets[count++] = { game.player, movementHeard_ && !crouched_, runningHeard_, voiceNoiseTime_[networkSelfSlot_]>0.f?std::clamp(static_cast<int>(2.f+voiceNoiseLevel_[networkSelfSlot_]*30.f),4,12):jumpHeight_>.01f?4:0, crouched_,false,elevation_ };
         for (int slot = 1; slot < maxCoopPlayers; ++slot)
         {
             const auto& player = remote_[slot];
             if (player.present) targets[count++] = { { static_cast<int>(player.z), static_cast<int>(player.x) },
-                player.moving, player.running, player.jumpHeight>.01f?4:0, player.crouched };
+                player.moving, player.running, voiceNoiseTime_[slot]>0.f?std::clamp(static_cast<int>(2.f+voiceNoiseLevel_[slot]*30.f),4,12):player.jumpHeight>.01f?4:0, player.crouched,false,player.elevation };
         }
         for (std::size_t house=0;house<refugeNoise_.size();++house)
-            if (refugeNoise_[house]>0.f) targets[count++]={safehouses_[house],true,true,10,false};
-        advanceHunterGroup(game.maze, hunter_, targets.data(), count, safehouses_);
+            if (refugeNoise_[house]>0.f) targets[count++]={safehouses_[house],true,true,10,false,true};
+        hunter_.elevation=hunterY_;
+        advanceHunterGroup(game.maze, hunter_, targets.data(), count, safehouses_,~doorMask());
         // A closed doorway delays entry. Repeated strikes force it open;
         // the route planner never cuts through the cabin walls.
         for (std::size_t house=0;house<safehouses_.size();++house)
@@ -1119,13 +1153,15 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
         if (!same(monster_, monsterFrom_))
             monsterTargetHeading_ = std::atan2(static_cast<float>(monster_.col - monsterFrom_.col),
                 static_cast<float>(monster_.row - monsterFrom_.row));
+        else if(hunter_.searchingArea && hunter_.linger>0)
+            monsterTargetHeading_+=.7f; // An audible pause and a readable look around.
         monsterStepDuration_ = hunter_.mode == HunterMode::Chase ? .84f : 1.15f;
         if (hunter_.mode == HunterMode::Chase && previousMode != HunterMode::Chase)
         {
             notice_ = "It has found you."; messageClock_ = 3.f;
         }
     }
-    updateInteriorHunter(seconds);
+    updateInteriorHunter(game,seconds);
     const float turn = std::remainder(monsterTargetHeading_ - monsterHeading_, 2.f * pi);
     monsterHeading_ += std::clamp(turn, -seconds * 4.f, seconds * 4.f);
     if (!same(monster_, monsterFrom_)) creatureGait_ += seconds * (hunter_.mode == HunterMode::Chase ? 9.f : 6.f);
@@ -1173,11 +1209,10 @@ void GameView::updateMonster(GameState& game, float seconds, bool playerMoving, 
             rattleClock_ = 0.f;
             for (std::size_t house = 0; house < safehouses_.size(); ++house)
             {
-                bool occupied = insideSafehouse(game.player, safehouses_[house]);
-                for (const auto& player : remote_)
-                    occupied = occupied || (player.present
-                        && insideSafehouse({ static_cast<int>(player.z), static_cast<int>(player.x) }, safehouses_[house]));
-                if (!occupied) continue;
+                // A remembered sighting/noise can justify testing a refuge.
+                // Silent occupants behind closed walls do not reveal themselves.
+                if(hunter_.memory<=0 || hunter_.mode==HunterMode::Patrol
+                    || !insideSafehouse(hunter_.lastKnown,safehouses_[house]))continue;
                 const int dr = hunter_.cell.row - safehouses_[house].row;
                 const int dc = hunter_.cell.col - safehouses_[house].col;
                 if (dr * dr + dc * dc > 20) continue;
@@ -1251,6 +1286,7 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
     heldBallLast_=held; throwClock_=std::max(0.f,throwClock_-seconds);
     drinkClock_ = std::max(0.f, drinkClock_ - seconds);
     for (auto& cooldown : drinkCooldowns_) cooldown=std::max(0.f,cooldown-seconds);
+    for(auto& timer:voiceNoiseTime_)timer=std::max(0.f,timer-seconds);
     for (auto& noise : refugeNoise_) noise=std::max(0.f,noise-seconds);
     elapsed_ += seconds; messageClock_ = std::max(0.f, messageClock_ - seconds);
     const auto previousStorm = sampleStorm(ambientTime_, game.mazeSeed.value_or(0)).event;
@@ -1339,6 +1375,10 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
     }
     if (!networkGuest_) updateRefugeGames(seconds);
     updateDoors(seconds);
+    const auto transmission=acousticTransmission(game.maze,game.player,monster_,safehouses_,~doorMask());
+    const float floorMuffle=std::abs(elevation_-hunterY_)>1.f?.65f:1.f;
+    hunterSoundGain_+=(transmission.gain*floorMuffle-hunterSoundGain_)*std::min(1.f,seconds*8.f);
+    hunterSoundClarity_+=(transmission.clarity*floorMuffle-hunterSoundClarity_)*std::min(1.f,seconds*8.f);
     updateFear(game, seconds);
     updateScares(game, seconds);
 }
@@ -1756,6 +1796,9 @@ SoundscapeFrame GameView::soundFrame() const
 {
     SoundscapeFrame frame;
     frame.active = initialized_; frame.moving = soundMoving_; frame.running = soundRunning_;
+    const float hushPhase=std::fmod(ambientTime_,59.f);
+    frame.ambienceHush=hunter_.mode==HunterMode::Chase?0.f:std::clamp(1.f-std::abs(hushPhase-22.f)/2.f,0.f,1.f);
+    frame.hunterGain=hunterSoundGain_; frame.hunterClarity=hunterSoundClarity_;
     frame.thunderEvent = thunderEvent_;
     float nearestSlot=64.f;
     for (std::size_t house=0;house<safehouses_.size();++house)
@@ -2646,6 +2689,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     breathFill.setPosition(breathTrack.getPosition());
     breathFill.setFillColor(exhausted_ ? sf::Color{ 170, 100, 78 } : sf::Color{ 190, 199, 166 });
     target.draw(breathFill);
+    voiceLabel_.setString(voiceStatus_);voiceLabel_.setPosition({static_cast<float>(viewport_.x)-240.f,65.f});target.draw(voiceLabel_);
     soundLabel_.setString(soundMuted_ ? "SOUND OFF" : soundStatus_ < 0 ? "NO AUDIO" : soundStatus_ > 0 ? "SOUND ON" : "SOUND ...");
     soundLabel_.setPosition({ static_cast<float>(viewport_.x) - 134.f, 49.f }); target.draw(soundLabel_);
     seedText_.setString("SEED  " + std::to_string(game.mazeSeed.value_or(0))

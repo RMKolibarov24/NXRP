@@ -30,6 +30,7 @@
     <ClCompile Include="CoopSmoke.cpp" />
     <ClCompile Include="..\Maze.Graphics\menu.cpp" />
     <ClCompile Include="..\Maze.Graphics\Soundscape.cpp" />
+    <ClCompile Include="..\Maze.Graphics\VoiceChat.cpp" />
     <ClCompile Include="..\Maze.Graphics\Multiplayer.cpp" />
     <ClCompile Include="..\Maze.Graphics\ExecutablePath.cpp" />
     <ClCompile Include="..\Maze.Graphics\SettingsPath.cpp" />

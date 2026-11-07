@@ -1,5 +1,6 @@
 #include "MazeApplication.h"
 #include "Maze.Game.h"
+#include "Maze.Acoustics.h"
 #include "Maze.Generation.h"
 #include "Maze.Settings.h"
 #include "Maze.Validation.h"
@@ -98,6 +99,7 @@ bool MazeApplication::canRestart() const noexcept
 
 void MazeApplication::showMainMenu()
 {
+    voice_.reset();voiceSpeaking_.fill(0.f);
     if (game_.phase == GamePhase::Playing) game_.phase = GamePhase::Paused;
     menu_.setHasActiveGame(canContinue());
     menu_.setCanRestart(canRestart());
@@ -129,6 +131,7 @@ void MazeApplication::restartCurrentGame()
 
 void MazeApplication::endNetwork()
 {
+    voice_.reset();voiceSequenceSeen_.fill(false);voiceSpeaking_.fill(0.f);voiceGeneration_=0;
     network_.stop(); networkRole_ = NetworkRole::Solo; networkStatus_ = Multiplayer::Status::Idle;
     networkPaused_ = false; joinedGeneration_ = 0; networkSlot_ = 0; networkSendClock_ = networkWaitClock_ = 0.f;
     gameView_.setNetworkGuest(false); gameView_.remoteDisconnected();
@@ -145,8 +148,96 @@ void MazeApplication::sendPlayer()
     network_.send(out.str());
 }
 
+void MazeApplication::playVoice(const VoicePacket& packet)
+{
+    if(!voiceEnabled_ || (mutedVoices_&(1u<<packet.actor)))return;
+    const auto source=gameView_.playerAt(packet.actor),listener=gameView_.localPlayer();
+    if(!source.present || !listener.present)return;
+    const float dx=source.x-listener.x,dz=source.z-listener.z;
+    const float distance=std::sqrt(dx*dx+dz*dz);
+    if(distance>=12.f)return;
+    const auto houses=generateSafehouses(game_.maze.size(),game_.mazeSeed.value_or(0));
+    const auto transmission=acousticTransmission(game_.maze,
+        {static_cast<int>(source.z),static_cast<int>(source.x)},game_.player,houses,~gameView_.openDoorMask());
+    const bool otherFloor=std::abs(source.elevation-listener.elevation)>1.f;
+    const float gain=transmission.gain*(1.f-distance/12.f)*(otherFloor?.55f:1.f);
+    const float pan=distance>.001f?std::clamp((-dx*std::cos(listener.angle)+dz*std::sin(listener.angle))/distance,-1.f,1.f):0.f;
+    voice_.play(packet,gain,pan,transmission.clarity*(otherFloor?.5f:1.f));
+    ++voiceReceived_[packet.actor];voiceSpeaking_[packet.actor]=.25f;
+}
+
+void MazeApplication::transmitVoice(VoicePacket packet)
+{
+    if(networkRole_==NetworkRole::Solo || game_.phase!=GamePhase::Playing || networkPaused_ || !gameView_.initialized())return;
+    packet.generation=networkRole_==NetworkRole::Host?networkGeneration_:joinedGeneration_;
+    if(!packet.generation)return;
+    packet.actor=networkRole_==NetworkRole::Host?0:networkSlot_;
+    if(networkRole_==NetworkRole::Guest){network_.send(serializeVoice(packet));return;}
+    gameView_.emitVoiceNoise(0,voiceLevel(packet));
+    const auto source=gameView_.localPlayer();
+    for(int peer=1;peer<maxCoopPlayers;++peer)
+    {
+        const auto listener=gameView_.playerAt(peer);
+        if(!listener.present || (source.x-listener.x)*(source.x-listener.x)+(source.z-listener.z)*(source.z-listener.z)>=144.f)continue;
+        network_.send(serializeVoice(packet),peer);
+    }
+}
+
+void MazeApplication::receiveVoice(const std::string& message,int peer)
+{
+    if(game_.phase!=GamePhase::Playing || networkPaused_ || !gameView_.initialized())return;
+    VoicePacket packet;if(!parseVoice(message,packet))return;
+    const unsigned generation=networkRole_==NetworkRole::Host?networkGeneration_:joinedGeneration_;
+    if(!generation || packet.generation!=generation)return;
+    if(voiceGeneration_!=generation)
+    {voiceGeneration_=generation;voiceSequenceSeen_.fill(false);voiceTokens_.fill(6.f);voice_.reset();}
+    if(networkRole_==NetworkRole::Host)
+    {
+        if(peer<1 || peer>=maxCoopPlayers || !(network_.connectedMask()&(1u<<peer)))return;
+        packet.actor=peer; // Never trust a guest's claimed speaker identity.
+    }
+    else if(networkRole_!=NetworkRole::Guest || peer!=0 || packet.actor==networkSlot_)return;
+    const int actor=packet.actor;
+    if(voiceTokens_[actor]<1.f || (voiceSequenceSeen_[actor] &&
+        static_cast<std::int32_t>(packet.sequence-voiceSequence_[actor])<=0))return;
+    voiceTokens_[actor]-=1.f;voiceSequenceSeen_[actor]=true;voiceSequence_[actor]=packet.sequence;
+    if(networkRole_==NetworkRole::Host)
+    {
+        const auto source=gameView_.playerAt(actor);if(!source.present)return;
+        gameView_.emitVoiceNoise(actor,voiceLevel(packet));
+        for(int destination=1;destination<maxCoopPlayers;++destination)
+        {
+            if(destination==actor)continue;
+            const auto listener=gameView_.playerAt(destination);
+            if(!listener.present || (source.x-listener.x)*(source.x-listener.x)+(source.z-listener.z)*(source.z-listener.z)>=144.f)continue;
+            network_.send(serializeVoice(packet),destination);
+        }
+    }
+    playVoice(packet);
+}
+
+void MazeApplication::updateVoice(sf::RenderWindow& window)
+{
+    const unsigned generation=networkRole_==NetworkRole::Host?networkGeneration_:joinedGeneration_;
+    if(voiceGeneration_!=generation)
+    {voice_.reset();voiceGeneration_=generation;voiceSequenceSeen_.fill(false);voiceTokens_.fill(6.f);}
+    const bool eligible=voiceEnabled_ && window.hasFocus() && game_.phase==GamePhase::Playing &&
+        !networkPaused_ && networkRole_!=NetworkRole::Solo && network_.connectedMask()!=0 &&
+        (networkRole_==NetworkRole::Host || joinedGeneration_>0) && gameView_.initialized();
+    const bool talking=eligible && sf::Keyboard::isKeyPressed(sf::Keyboard::Key::V);
+    voice_.setTalking(talking);
+    for(auto packet:voice_.captured())if(talking)transmitVoice(packet);
+    std::string status=!voiceEnabled_?"VOICE OFF / F8":"VOICE / HOLD V";
+    if(talking)status=voice_.status()==-1?"VOICE / NO MICROPHONE":"VOICE / TRANSMITTING";
+    else if(voice_.status()==-2)status="VOICE / NO OUTPUT DEVICE";
+    for(int peer=0;peer<maxCoopPlayers;++peer)if(voiceSpeaking_[peer]>0.f)status+=" "+std::to_string(peer+1);
+    gameView_.setVoiceStatus(status);
+}
+
 void MazeApplication::updateNetwork(float seconds)
 {
+    for(int actor=0;actor<maxCoopPlayers;++actor)
+    {voiceTokens_[actor]=std::min(6.f,voiceTokens_[actor]+std::clamp(seconds,0.f,.2f)*60.f);voiceSpeaking_[actor]=std::max(0.f,voiceSpeaking_[actor]-seconds);}
     if (networkRole_ == NetworkRole::Solo) return;
     const auto status = network_.status();
     if (status != networkStatus_)
@@ -164,6 +255,7 @@ void MazeApplication::updateNetwork(float seconds)
     {
         if (networkRole_ == NetworkRole::Host && message.kind == MultiplayerMessage::Kind::Joined)
         {
+            voiceSequenceSeen_[message.peer]=false;voiceTokens_[message.peer]=6.f;voiceSpeaking_[message.peer]=0.f;
             gameView_.remoteDisconnected(message.peer);
             gameView_.showNetworkNotice("A companion joined the maze.");
             networkSendClock_ = .1f;
@@ -171,12 +263,14 @@ void MazeApplication::updateNetwork(float seconds)
         }
         if (networkRole_ == NetworkRole::Host && message.kind == MultiplayerMessage::Kind::Left)
         {
+            voiceSequenceSeen_[message.peer]=false;voiceTokens_[message.peer]=6.f;voiceSpeaking_[message.peer]=0.f;
             gameView_.remoteDisconnected(message.peer);
             gameView_.showNetworkNotice("A companion left the maze.");
             continue;
         }
         if (message.kind != MultiplayerMessage::Kind::Data) continue;
         std::istringstream in(message.text); char type = 0; in >> type;
+        if(type=='V'){receiveVoice(message.text,message.peer);continue;}
         if (networkRole_ == NetworkRole::Guest && type == 'F')
         {
             endNetwork(); menu_.showMultiplayer(); menu_.showMessage("That game already has four players.");
@@ -214,7 +308,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             unsigned version, generation, seed, phase; int rows, cols, selfSlot;
             if (!(in >> version)) continue;
-            if (version != 10)
+            if (version != 11)
             {
                 endNetwork(); menu_.showMultiplayer(); menu_.showMessage("Different game version. Everyone needs the same build.");
                 return;
@@ -290,7 +384,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             if (!(network_.connectedMask() & (1u << slot))) continue;
             std::ostringstream out;
-            out << "W 10 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
+            out << "W 11 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
                 << ' ' << *game_.mazeSeed << ' ' << phase << ' ' << slot << ' ' << world;
             network_.send(out.str(), slot);
         }
@@ -309,6 +403,14 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
 {
     // Account for time in the old phase before an event pauses, resumes or wins.
     updateTime(now);
+    if(const auto* key=event.getIf<sf::Event::KeyPressed>())
+    {
+        if(key->code==sf::Keyboard::Key::F8)
+        {voiceEnabled_=!voiceEnabled_;voice_.setMuted(!voiceEnabled_);return;}
+        const sf::Keyboard::Key muteKeys[]={sf::Keyboard::Key::F1,sf::Keyboard::Key::F2,sf::Keyboard::Key::F3,sf::Keyboard::Key::F4};
+        for(int peer=0;peer<maxCoopPlayers;++peer)if(key->code==muteKeys[peer])
+        {mutedVoices_^=1u<<peer;voice_.reset();voiceSpeaking_[peer]=0.f;gameView_.showNetworkNotice("Voice "+std::to_string(peer+1)+((mutedVoices_&(1u<<peer))?" muted":" unmuted"));return;}
+    }
     if (event.is<sf::Event::Closed>())
     {
         endNetwork();
@@ -454,6 +556,7 @@ void MazeApplication::update(sf::RenderWindow& window, Clock::time_point now)
     const float seconds = std::chrono::duration<float>(now - previousFrame_).count();
     previousFrame_ = now;
     updateNetwork(seconds);
+    updateVoice(window);
     if (game_.phase == GamePhase::Playing && window.hasFocus())
     {
         const auto size = window.getSize();

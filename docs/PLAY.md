@@ -28,10 +28,25 @@ For co-op, all players need this same build. Multiplayer > Host listens on TCP
 the internet use a configured TCP tunnel or port forwarding. The host controls
 shared doors, puzzles, balls, slots and the hunter. Host pause pauses the world.
 
+Hold V for proximity voice chat while playing co-op. Release V to stop microphone
+capture. Speech fades over 12 maze units, is muffled by walls/doors and attracts
+the hunter. F8 turns voice off/on; F1-F4 mute individual players locally (host is
+player 1). The HUD shows transmitting, active speakers and device errors. Voice
+is not recorded. Pausing or losing window focus stops capture and clears audio.
+M controls game sounds separately from voice. A working Windows microphone and
+output device are required; use F8 twice to retry after changing a device.
+
+The hunter investigates sounds and its last sighting. It pauses at a lost trail,
+checks nearby routes, then gives up without further evidence. Repeatedly taking
+an escape it can see makes that route more likely to be checked. Quiet crouching
+and changing routes help. Upper floors and closed doors block sight; running,
+speech, slots and glasses can still give you away. Door strikes warn before a
+forced entry. It cannot track a silent hidden player through the floor.
+
 Asset attribution is included in assets/models/README.md,
 assets/textures/README.md and assets/fonts/README.md.
 
 The hands close around carried basketballs, open with throw follow-through, and
 reach to the model's actual lever knob during its pull. Hold interactions briefly
 lock walking; the bar has a visible stool and a specific sit/drink prompt.
-All co-op players need this protocol-10 build for seated stance and handle actors.
+All co-op players need this protocol-11 build for matching world and voice messages.

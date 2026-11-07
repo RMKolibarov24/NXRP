@@ -13,6 +13,23 @@ namespace MazeUnitTest
     TEST_CLASS(SoundscapeTests)
     {
     public:
+        TEST_METHOD(OcclusionRemovesMonsterHighFrequencyDetail)
+        {
+            SoundscapeSynth baseline,clear,muffled;
+            SoundscapeFrame frame;frame.active=true;frame.threat=1.f;frame.hunterChasing=true;frame.hunterMoving=true;
+            std::array<std::int16_t,8192> silence{},bright{},dark{};
+            frame.hunterGain=0.f;baseline.render(silence.data(),silence.size()/2,frame);
+            frame.hunterGain=1.f;frame.hunterClarity=1.f;clear.render(bright.data(),bright.size()/2,frame);
+            frame.hunterClarity=0.f;muffled.render(dark.data(),dark.size()/2,frame);
+            double clearRoughness=0.,muffledRoughness=0.;
+            for(std::size_t i=4;i<bright.size();i+=2)
+            {
+                const double a=(bright[i]-silence[i])-(bright[i-2]-silence[i-2]);
+                const double b=(dark[i]-silence[i])-(dark[i-2]-silence[i-2]);
+                clearRoughness+=a*a;muffledRoughness+=b*b;
+            }
+            Assert::IsTrue(clearRoughness>1000. && muffledRoughness<clearRoughness*.8);
+        }
         TEST_METHOD(SlotAndDrinkSoundsAreDistinctAndPauseFadesThem)
         {
             SoundscapeFrame frame; frame.active=true;

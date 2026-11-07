@@ -65,6 +65,7 @@
     <ClCompile Include="menu.cpp" />
     <ClCompile Include="GameView.cpp" />
     <ClCompile Include="Soundscape.cpp" />
+    <ClCompile Include="VoiceChat.cpp" />
     <ClCompile Include="Multiplayer.cpp" />
     <ClCompile Include="GameStatisticsText.cpp" />
     <ClCompile Include="MazeApplication.cpp" />

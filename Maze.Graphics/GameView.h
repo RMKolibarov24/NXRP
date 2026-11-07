@@ -77,6 +77,10 @@ public:
     bool rayTracingActive() const noexcept { return postReady_ && rayTraceEnabled_; }
     void setNetworkGuest(bool guest) noexcept { networkGuest_ = guest; if (!guest) networkSelfSlot_ = 0; }
     RemotePlayer localPlayer() const noexcept;
+    unsigned openDoorMask() const noexcept { return doorMask(); }
+    RemotePlayer playerAt(int slot) const noexcept { return slot==networkSelfSlot_?localPlayer():slot>=0 && slot<maxCoopPlayers?remote_[slot]:RemotePlayer{}; }
+    void emitVoiceNoise(int slot,float level);
+    void setVoiceStatus(std::string text) { voiceStatus_=std::move(text); }
     void setRemotePlayer(int slot, const RemotePlayer& player) noexcept;
     std::string worldSnapshot() const;
     bool applyWorldSnapshot(GameState& game, const std::string& data, int selfSlot);
@@ -108,7 +112,7 @@ private:
     bool nearInscription() const;
     void resetHunter(const GameState& game);
     void updateMonster(GameState& game, float seconds, bool playerMoving, bool playerRunning);
-    void updateInteriorHunter(float seconds);
+    void updateInteriorHunter(const GameState& game,float seconds);
     void updateShift(GameState& game, float seconds);
     void updateDoors(float seconds);
     void updateFear(GameState& game, float seconds);
@@ -129,6 +133,9 @@ private:
     void drawHedgeChunks(const GameState& game, int r0, int r1, int c0, int c1);
     void drawFoliageChunks(const GameState& game, int r0, int r1, int c0, int c1);
     sf::Vector2u viewport_{ 900u, 600u };
+    sf::Text voiceLabel_;
+    std::string voiceStatus_="VOICE / HOLD V";
+    std::array<float,maxCoopPlayers> voiceNoiseTime_{},voiceNoiseLevel_{};
     sf::Text heading_, objective_, journal_, hint_, seedText_, feedback_, staminaLabel_, soundLabel_;
     bool initialized_ = false;
     std::unique_ptr<sf::Shader> worldShader_, creatureShader_, foliageShader_, postShader_, reelShader_;
@@ -187,6 +194,7 @@ private:
     std::uint32_t seenRemoteCaptures_ = 0;
     std::array<float, maxCoopPlayers> remoteCaptureCooldown_{};
     int soundStatus_ = 0;
+    float hunterSoundGain_ = 1.f, hunterSoundClarity_ = 1.f;
     float monsterClock_ = 0.f, monsterStepDuration_ = 1.15f, shiftClock_ = 0.f, messageClock_ = 0.f;
     float directorClock_ = 0.f;
     float shiftDelay_ = 14.f;
@@ -204,6 +212,7 @@ private:
     bool interiorHunter_ = false;
     int interiorHouse_ = -1, interiorPhase_ = 0;
     float hunterX_ = 0.f, hunterZ_ = 0.f, hunterY_ = 0.f;
+    float interiorGoalX_=0.f,interiorGoalZ_=0.f,interiorGoalY_=0.f,interiorMemory_=0.f;
     float monsterHeading_ = 0.f, monsterTargetHeading_ = 0.f, creatureGait_ = 0.f;
     enum class ShiftPhase { Idle, Opening, Open, Closing };
     ShiftPhase shiftPhase_ = ShiftPhase::Idle;

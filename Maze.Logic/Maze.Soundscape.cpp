@@ -57,7 +57,7 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         breathNoise_ += .09f * (noise - breathNoise_);
         const float gust = .65f + .35f * std::sin(time_ * .19f);
         const float drone = std::sin(time_ * 2.f * pi * 46.f) * .012f;
-        float sample = wind_ * 1.1f * gust + drone;
+        float sample = (wind_ * 1.1f * gust + drone)*(1.f-.9f*std::clamp(frame.ambienceHush,0.f,1.f));
         if (frame.moving)
         {
             const float period = frame.running ? .34f : .53f;
@@ -93,7 +93,9 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         whisperAmp_ *= std::exp(-dt / 2.6f);
         whisperNoise_ += .05f * (noise - whisperNoise_);
         const float whisperEnvelope = std::sin(std::clamp(whisperPhase_ / 2.4f, 0.f, 1.f) * pi);
-        const float whisper = whisperAmp_ * whisperEnvelope * whisperNoise_
+        const float knockEnvelope=std::exp(-std::abs(whisperPhase_-.18f)*65.f)+.65f*std::exp(-std::abs(whisperPhase_-.61f)*65.f);
+        const float distantKnock=whisperAmp_*knockEnvelope*(.065f*std::sin(whisperPhase_*2.f*pi*78.f)+noise*.025f);
+        const float whisper = distantKnock + whisperAmp_ * whisperEnvelope * whisperNoise_
             * (.55f + .45f * std::sin(time_ * 2.f * pi * 2.7f)) * .13f;
         whisperPan_ += .004f * (whisperPan - whisperPan_);
         hunterPan_ += .0015f * (hunterPan - hunterPan_);
@@ -101,7 +103,8 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         if (frame.hunterMoving)
         {
             hunterPhase_ += dt;
-            if (hunterPhase_ >= hunterPeriod) hunterPhase_ -= hunterPeriod;
+            const float unevenPeriod=hunterPeriod*(1.f+.11f*std::sin(time_*3.7f)+.05f*std::sin(time_*7.1f));
+            if (hunterPhase_ >= unevenPeriod) hunterPhase_ -= unevenPeriod;
         }
         else hunterPhase_ = 0.f;
         const float hunterStep = frame.hunterMoving ? std::exp(-hunterPhase_ * 12.f) : 0.f;
@@ -136,6 +139,10 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         // Uneven subharmonics and a rasp keep the pursuer less human-sounding.
         const float rasp=threat*.025f*breathEnvelope*(noise-breathNoise_)*roughness;
         sample += glass;
+        const float cutoff=350.f+std::clamp(frame.hunterClarity,0.f,1.f)*6000.f;
+        const float filterAlpha=1.f-std::exp(-2.f*pi*cutoff*dt);
+        occludedHunter_+=(creature*1.12f+rasp-occludedHunter_)*filterAlpha;
+        const float heardHunter=occludedHunter_*std::clamp(frame.hunterGain,0.f,1.f);
         if (thunderDelay_ > 0.f)
         {
             thunderDelay_ -= dt;
@@ -144,10 +151,10 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         sample += thunder_ * .48f * wind_;
         thunder_ *= std::exp(-dt / 1.8f);
         gain_ += .002f * ((frame.active ? 1.f : 0.f) - gain_);
-        const float left = sample + creature * (1.f - hunterPan_) + branches * (1.f - shiftingPan_)
-            + door * (1.f - doorPan_) + whisper * (1.f - whisperPan_) + (creature*.12f+rasp)*(1.f-hunterPan_) + machine*(1.f-std::clamp(frame.slotPan,-1.f,1.f));
-        const float right = sample + creature * (1.f + hunterPan_) + branches * (1.f + shiftingPan_)
-            + door * (1.f + doorPan_) + whisper * (1.f + whisperPan_) + (creature*.12f+rasp)*(1.f+hunterPan_) + machine*(1.f+std::clamp(frame.slotPan,-1.f,1.f));
+        const float left = sample + heardHunter * (1.f - hunterPan_) + branches * (1.f - shiftingPan_)
+            + door * (1.f - doorPan_) + whisper * (1.f - whisperPan_) + machine*(1.f-std::clamp(frame.slotPan,-1.f,1.f));
+        const float right = sample + heardHunter * (1.f + hunterPan_) + branches * (1.f + shiftingPan_)
+            + door * (1.f + doorPan_) + whisper * (1.f + whisperPan_) + machine*(1.f+std::clamp(frame.slotPan,-1.f,1.f));
         output[2 * i] = static_cast<std::int16_t>(std::clamp(left * gain_, -1.f, 1.f) * 32767.f);
         output[2 * i + 1] = static_cast<std::int16_t>(std::clamp(right * gain_, -1.f, 1.f) * 32767.f);
         time_ += dt;

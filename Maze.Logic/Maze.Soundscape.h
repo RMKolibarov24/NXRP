@@ -12,6 +12,7 @@ struct SoundscapeFrame
     bool moving = false;
     bool running = false;
     float threat = 0.f;
+    float hunterGain=1.f,hunterClarity=1.f,ambienceHush=0.f;
     float shifting = 0.f;
     float hunterPan = 0.f;
     float shiftingPan = 0.f;
@@ -52,4 +53,5 @@ private:
     bool wasSpinning_ = false, slotWin_ = false;
     float slotPhase_ = 0.f, slotPull_ = 0.f, slotResult_ = 0.f, slotResultTime_ = 0.f;
     float glass_ = 0.f, glassPhase_ = 0.f;
+    float occludedHunter_ = 0.f;
 };

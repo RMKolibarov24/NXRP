@@ -3,6 +3,7 @@
 #include "Maze.Generation.h"
 #include "Maze.Hunter.h"
 #include "Maze.Safehouse.h"
+#include "Maze.Acoustics.h"
 #include "Maze.Puzzle.h"
 #include <cstdint>
 
@@ -13,6 +14,109 @@ namespace MazeUnitTest
     TEST_CLASS(MazeHunterTests)
     {
     public:
+        TEST_METHOD(HiddenPlayerMovementCannotSteerRememberedSearch)
+        {
+            MazeGrid maze({12,12});maze.fill(MazeCell::Passage);
+            HunterState first;first.cell={5,5};first.previous={5,4};first.lastKnown={5,7};
+            first.searchGoal=first.lastKnown;first.mode=HunterMode::Search;first.memory=12;first.random=7;
+            auto second=first;
+            // Both silent players are hidden behind an upper floor. Their actual
+            // coordinates differ each step; identical remembered searches must result.
+            for(int step=0;step<18;++step)
+            {
+                const HunterTarget a{{2+step%3,3},false,false,0,false,false,2.f};
+                const HunterTarget b{{8,7+step%3},false,false,0,false,false,2.f};
+                advanceHunterGroup(maze,first,&a,1);advanceHunterGroup(maze,second,&b,1);
+                Assert::AreEqual(first.cell.row,second.cell.row);Assert::AreEqual(first.cell.col,second.cell.col);
+                Assert::IsTrue(first.mode==second.mode);
+                Assert::AreEqual(5,first.lastKnown.row);Assert::AreEqual(7,first.lastKnown.col);
+            }
+        }
+        TEST_METHOD(SearchLingersThenChecksAreaAndEventuallyGivesUp)
+        {
+            MazeGrid maze({12,12});maze.fill(MazeCell::Passage);
+            HunterState hunter;hunter.cell={5,5};hunter.lastKnown={5,5};
+            hunter.searchGoal={5,5};hunter.memory=7;hunter.mode=HunterMode::Search;
+            hunter.previous={5,4};hunter.random=42;
+            advanceHunterGroup(maze,hunter,nullptr,0);
+            Assert::IsTrue(hunter.mode==HunterMode::Search && hunter.searchingArea);
+            Assert::AreEqual(5,hunter.cell.col);Assert::AreEqual(5,hunter.cell.row);
+            advanceHunterGroup(maze,hunter,nullptr,0);
+            Assert::AreEqual(5,hunter.cell.col);Assert::AreEqual(5,hunter.cell.row);
+            advanceHunterGroup(maze,hunter,nullptr,0);
+            Assert::IsTrue(hunter.cell.col!=5 || hunter.cell.row!=5);
+            for(int step=0;step<20;++step)advanceHunterGroup(maze,hunter,nullptr,0);
+            Assert::IsTrue(hunter.mode==HunterMode::Patrol && hunter.memory==0);
+            Assert::AreEqual(5,hunter.lastKnown.row);Assert::AreEqual(5,hunter.lastKnown.col);
+        }
+        TEST_METHOD(OnlyObservedJunctionExitsAreLearnedAndBiasSearch)
+        {
+            MazeGrid maze({12,12});maze.fill(MazeCell::Passage);
+            HunterState hunter;hunter.cell={4,1};hunter.previous={4,0};
+            HunterTarget target{{4,4},false,false};
+            advanceHunterGroup(maze,hunter,&target,1);
+            target.cell={4,5};advanceHunterGroup(maze,hunter,&target,1);
+            Assert::IsTrue(hunter.routes[0].junction.row==4 && hunter.routes[0].junction.col==4);
+            Assert::AreEqual(5,hunter.routes[0].exit.col);
+            const unsigned confidence=hunter.routes[0].confidence;
+            target.audibleOnly=true;target.cell={4,6};
+            advanceHunterGroup(maze,hunter,&target,1);
+            Assert::AreEqual(confidence,hunter.routes[0].confidence);
+            for(const auto& route:hunter.routes)Assert::IsFalse(route.junction.col==5 && route.confidence>0);
+            hunter.routes[0].confidence=5;
+            int chosen=0;
+            for(unsigned seed=1;seed<=100;++seed)
+            {
+                auto probe=hunter;probe.cell=probe.lastKnown=probe.searchGoal={4,4};
+                probe.previous={4,3};probe.searchingArea=true;probe.linger=0;probe.memory=5;probe.random=seed;
+                advanceHunterGroup(maze,probe,nullptr,0);
+                chosen+=probe.cell.row==4 && probe.cell.col==5;
+            }
+            Assert::IsTrue(chosen>60 && chosen<100); // learned, but still escapable
+        }
+        TEST_METHOD(FloorsHideSilentPlayersAndMuffleTheirFootsteps)
+        {
+            MazeGrid maze({12,12});maze.fill(MazeCell::Passage);
+            HunterState hunter;hunter.cell={5,5};hunter.previous={5,4};
+            HunterTarget upstairs{{5,6},false,false,0,false,false,2.f};
+            Assert::AreEqual(0,senseHunterTarget(maze,hunter,upstairs));
+            upstairs.moving=true;
+            Assert::AreEqual(0,senseHunterTarget(maze,hunter,upstairs));
+            upstairs.running=true;
+            Assert::AreEqual(1,senseHunterTarget(maze,hunter,upstairs));
+            advanceHunterGroup(maze,hunter,&upstairs,1);
+            Assert::IsTrue(hunter.mode==HunterMode::Search);
+            Assert::AreEqual(2.f,hunter.lastKnownElevation);
+        }
+        TEST_METHOD(ClosedDoorsMuffleAudioAndBlockSight)
+        {
+            MazeGrid maze({12,12});maze.fill(MazeCell::Passage);
+            const std::vector<MazePosition> houses{{5,5}};
+            const MazePosition outside{5,2},inside{5,5};
+            const auto clear=acousticTransmission(maze,outside,inside,houses,0);
+            const auto closed=acousticTransmission(maze,outside,inside,houses,1u);
+            Assert::IsTrue(closed.gain<clear.gain && closed.clarity<clear.clarity);
+            Assert::IsTrue(acousticReachable(maze,outside,inside,3,houses,0));
+            Assert::IsFalse(acousticReachable(maze,outside,inside,3,houses,1u));
+            HunterState hunter;hunter.cell=outside;hunter.previous={5,1};hunter.random=7;
+            const HunterTarget quiet{inside,false,false};
+            advanceHunterGroup(maze,hunter,&quiet,1,houses,1u);
+            Assert::IsTrue(hunter.mode==HunterMode::Patrol);
+            hunter.cell=outside;hunter.previous={5,1};
+            advanceHunterGroup(maze,hunter,&quiet,1,houses,0);
+            Assert::IsTrue(hunter.mode==HunterMode::Chase);
+        }
+        TEST_METHOD(FoliageLayersMuffleHighFrequencies)
+        {
+            MazeGrid maze({10,10});maze.fill(MazeCell::Passage);
+            const auto clear=acousticTransmission(maze,{4,1},{4,7});
+            maze.at(4,3)=MazeCell::Wall;
+            const auto one=acousticTransmission(maze,{4,1},{4,7});
+            maze.at(4,5)=MazeCell::Wall;
+            const auto two=acousticTransmission(maze,{4,1},{4,7});
+            Assert::IsTrue(clear.gain>one.gain && one.gain>two.gain);
+            Assert::IsTrue(clear.clarity>one.clarity && one.clarity>two.clarity);
+        }
         TEST_METHOD(DistantHunterRelocationStaysOutOfViewAndRefuges)
         {
             MazeGrid maze({30,30}); maze.fill(MazeCell::Passage);
