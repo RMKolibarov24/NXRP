@@ -27,6 +27,21 @@
 
 int main()
 {
+    // Stair rise and gallery transition must agree with collision/camera height.
+    const std::vector<MazePosition> refugeProbe{ { 4, 4 } };
+    float stairHeight = 0.f;
+    for (int step = 0; step <= 100; ++step)
+    {
+        const float z = 4.5f + refugeScale * (.30f + .85f * step / 100.f);
+        const float next = refugeFloorHeight(4.5f + .98f * refugeScale, z, stairHeight, refugeProbe);
+        assert(next >= stairHeight - .0001f && next - stairHeight < .03f);
+        stairHeight = next;
+    }
+    assert(std::abs(stairHeight - refugeUpperFloor) < .001f);
+    assert(refugeFloorHeight(4.5f, 4.5f + 1.15f * refugeScale, stairHeight, refugeProbe) == refugeUpperFloor);
+    for (int step = 100; step >= 0; --step)
+        stairHeight = refugeFloorHeight(4.5f + .98f * refugeScale, 4.5f + refugeScale * (.30f + .85f * step / 100.f), stairHeight, refugeProbe);
+    assert(stairHeight < .001f);
     sf::Font font; assert(font.openFromFile("assets/fonts/SourceSans3-Semibold.ttf"));
     sf::RenderWindow window(sf::VideoMode({640, 560}), "Co-op smoke test"); window.setVisible(false);
     Menu menu(font); menu.resize({640,560});
@@ -130,8 +145,13 @@ int main()
     assert(!hv.safehouses_.empty());
     const auto refuge = hv.safehouses_[0];
     const float houseX = refuge.col+.5f, houseZ = refuge.row+.5f;
-    assert(hv.walkable(host.game_, houseX, houseZ - 1.45f));
-    assert(!hv.walkable(host.game_, houseX + 1.02f, houseZ - 1.45f));
+    // Safehouse doors start closed, block the threshold and can be opened.
+    assert(!hv.walkable(host.game_, houseX, houseZ - 1.45f * refugeScale));
+    hv.toggleDoor(0, 2);
+    hv.updateDoors(1.f);
+    assert(hv.doors_[0][2].open);
+    assert(hv.walkable(host.game_, houseX, houseZ - 1.45f * refugeScale));
+    assert(!hv.walkable(host.game_, houseX + 1.02f * refugeScale, houseZ - 1.45f * refugeScale));
     second.gameView_.x_=refuge.col+.5f; second.gameView_.z_=refuge.row+.5f; second.game_.player=refuge;
     second.sendPlayer(); pump(40);
     assert(hv.checkpoints_[second.networkSlot_]==0 && second.gameView_.checkpoints_[second.networkSlot_]==0);
@@ -181,9 +201,92 @@ int main()
     }
     assert(hv.solved_==3);
     for (int i=0; i<3; ++i) assert(guests[i]->gameView_.solved_==3);
+    // Physical games are host-authoritative and shared between actual TCP peers.
+    const auto gamesHouse = hv.safehouses_[0];
+    for (auto* guest : { &first, &second })
+    {
+        guest->gameView_.x_ = gamesHouse.col + .5f - .7f;
+        guest->gameView_.z_ = gamesHouse.row + .5f + .5f;
+        guest->gameView_.elevation_ = refugeUpperFloor;
+        guest->gameView_.angle_ = 0.f; guest->game_.player = gamesHouse;
+        guest->sendPlayer();
+    }
+    pump(30); sendKey(first, 'G');
+    assert(hv.refugeBalls_[0][1].carrier == first.networkSlot_);
+    sendKey(second, 'G');
+    assert(hv.refugeBalls_[0][1].carrier == first.networkSlot_);
+    for (int i=0; i<3; ++i) assert(guests[i]->gameView_.refugeBalls_[0][1].carrier == first.networkSlot_);
+    sendKey(first, 'G');
+    assert(hv.refugeBalls_[0][1].carrier == -1 && hv.refugeBalls_[0][1].vy > 0.f);
+    auto& basket = hv.refugeBalls_[0][1];
+    basket.x = -.55f; basket.z = 1.53f; basket.y = 1.13f;
+    basket.vx = basket.vz = 0.f; basket.vy = -1.f;
+    hv.updateRefugeGames(.03f); assert(basket.scoreA == 1);
+    auto& football = hv.refugeBalls_[0][0];
+    football.x = -.55f; football.z = 1.91f; football.vz = 2.f;
+    hv.updateRefugeGames(.03f); assert(football.scoreA == 1 && football.scoreB == 0);
+    football.x = -.55f; football.z = -1.91f; football.vz = -2.f;
+    hv.updateRefugeGames(.03f); assert(football.scoreA == 1 && football.scoreB == 1);
+    pump(30);
+    for (int i=0;i<3;++i)
+    { assert(guests[i]->gameView_.refugeBalls_[0][1].scoreA == 1); assert(guests[i]->gameView_.refugeBalls_[0][0].scoreB == 1); }
+    // Ground-floor players cannot take upstairs balls.
+    first.gameView_.elevation_ = 0.f; first.sendPlayer(); pump(20); sendKey(first, 'G');
+    assert(basket.carrier == -1);
+    // Guests pull the physical cabinet handle; cooldown is shared per cabinet.
+    first.gameView_.x_ = gamesHouse.col + .5f - .56f * refugeScale;
+    first.gameView_.z_ = gamesHouse.row + .5f - .85f * refugeScale + .50f;
+    first.gameView_.angle_ = 3.14159265f; first.gameView_.elevation_ = 0.f;
+    first.sendPlayer(); pump(20); sendKey(first, 'E');
+    assert(hv.refugeSlots_[0].spins == 1);
+    for (int i=0;i<3;++i) assert(guests[i]->gameView_.refugeSlots_[0].symbols == hv.refugeSlots_[0].symbols);
+    sendKey(first, 'E'); assert(hv.refugeSlots_[0].spins == 1);
+    if (hv.refugeSlots_.size() > 1) assert(hv.refugeSlots_[1].spins == 0);
+    first.gameView_.elevation_ = refugeUpperFloor;
+    hv.elapsed_ += 3.f; first.sendPlayer(); pump(20); sendKey(first, 'E');
+    assert(hv.refugeSlots_[0].spins == 1);
+    // Walk up the stair, onto the gallery, back to the stair and down again.
+    hv.x_ = gamesHouse.col + .5f + .98f * refugeScale;
+    hv.z_ = gamesHouse.row + .5f + .20f * refugeScale;
+    hv.elevation_ = 0.f; hv.angle_ = 0.f; hv.elapsed_ = 0.f;
+    host.game_.player = gamesHouse;
+    GameInput stairWalk; stairWalk.forward = 1.f;
+    for (int i=0;i<30;++i) hv.update(host.game_,.05f,stairWalk);
+    assert(hv.elevation_ > refugeUpperFloor - .01f);
+    stairWalk.forward = 0.f; stairWalk.strafe = 1.f;
+    for (int i=0;i<16;++i) hv.update(host.game_,.05f,stairWalk);
+    assert(hv.elevation_ == refugeUpperFloor && hv.x_ < gamesHouse.col + .5f + .65f * refugeScale);
+    stairWalk.strafe = -1.f;
+    for (int i=0;i<16;++i) hv.update(host.game_,.05f,stairWalk);
+    stairWalk.strafe = 0.f; stairWalk.forward = -1.f;
+    for (int i=0;i<30;++i) hv.update(host.game_,.05f,stairWalk);
+    assert(hv.elevation_ < .01f);
+    // A complete pickup/throw arc can score; scoring isn't just a HUD command.
+    hv.x_ = gamesHouse.col + .5f - .55f; hv.z_ = gamesHouse.row + .5f - .713f;
+    hv.elevation_ = refugeUpperFloor; hv.angle_ = 0.f;
+    basket.x = -.55f; basket.z = -.713f; basket.y = .13f; basket.carrier = -1;
+    basket.vx = basket.vy = basket.vz = 0.f;
+    hv.playRefugeBall(true, 0); assert(basket.carrier == 0);
+    hv.updateRefugeGames(.01f); hv.playRefugeBall(true, 0);
+    const unsigned beforeArc = basket.scoreA;
+    hv.updateRefugeGames(1.2f); assert(basket.scoreA == beforeArc + 1);
+    basket.carrier = first.networkSlot_; hv.remote_[first.networkSlot_].present = false;
+    hv.updateRefugeGames(.01f); assert(basket.carrier == -1);
     Multiplayer unavailable; unavailable.join("127.0.0.1", 1);
     for (int i=0; i<400 && unavailable.status()==Multiplayer::Status::Connecting; ++i)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     assert(unavailable.status()==Multiplayer::Status::Error);
+    // Render current cabin geometry on both floors for visual review.
+    host.game_.phase = GamePhase::Playing;
+    const auto renderHouse = hv.safehouses_.front();
+    hv.x_ = renderHouse.col + .5f; hv.z_ = renderHouse.row + .5f;
+    host.game_.player = renderHouse; hv.angle_ = 3.8f; hv.pitch_ = 0.f;
+    hv.elevation_ = 0.f; hv.resize({640,560});
+    sf::RenderTexture refugeTarget({640,560}, sf::ContextSettings{24});
+    hv.draw(refugeTarget, host.game_); refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/refuge-ground.png"));
+    hv.elevation_ = refugeUpperFloor; hv.angle_ = 0.f; hv.pitch_ = -.12f;
+    hv.draw(refugeTarget, host.game_); refugeTarget.display();
+    assert(refugeTarget.getTexture().copyToImage().saveToFile("build/refuge-upper.png"));
     std::cout << "Four-player joins, capacity, both puzzles, refuges, captures, shifting, reconnect, and victory passed.\n";
 }

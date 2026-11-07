@@ -31,6 +31,9 @@ namespace
 
     char networkKey(sf::Keyboard::Key key)
     {
+        if (key == sf::Keyboard::Key::Space) return 'S';
+        if (key == sf::Keyboard::Key::G) return 'G';
+        if (key == sf::Keyboard::Key::K) return 'K';
         if (key == sf::Keyboard::Key::E) return 'E';
         if (key == sf::Keyboard::Key::Backspace) return 'B';
         if (key == sf::Keyboard::Key::Enter) return 'N';
@@ -46,6 +49,9 @@ namespace
 
     sf::Keyboard::Key decodeNetworkKey(char key)
     {
+        if (key == 'S') return sf::Keyboard::Key::Space;
+        if (key == 'G') return sf::Keyboard::Key::G;
+        if (key == 'K') return sf::Keyboard::Key::K;
         if (key == 'E') return sf::Keyboard::Key::E;
         if (key == 'B') return sf::Keyboard::Key::Backspace;
         if (key == 'N') return sf::Keyboard::Key::Enter;
@@ -137,7 +143,7 @@ void MazeApplication::sendPlayer()
     if (!player.present) return;
     if (game_.phase != GamePhase::Playing || networkPaused_) player.moving = player.running = false;
     std::ostringstream out; out.precision(8);
-    out << "P " << player.x << ' ' << player.z << ' ' << player.angle << ' ' << player.moving << ' ' << player.running;
+    out << "P " << player.x << ' ' << player.z << ' ' << player.angle << ' ' << player.moving << ' ' << player.running << ' ' << player.elevation;
     network_.send(out.str());
 }
 
@@ -181,8 +187,8 @@ void MazeApplication::updateNetwork(float seconds)
         if (networkRole_ == NetworkRole::Host && type == 'P' && gameView_.initialized())
         {
             RemotePlayer player; int moving, running; std::string extra;
-            if (!(in >> player.x >> player.z >> player.angle >> moving >> running) || (in >> extra) ||
-                !std::isfinite(player.x) || !std::isfinite(player.z) || !std::isfinite(player.angle) ||
+            if (!(in >> player.x >> player.z >> player.angle >> moving >> running >> player.elevation) || (in >> extra) ||
+                !std::isfinite(player.elevation) || player.elevation < 0.f || player.elevation > refugeUpperFloor || !std::isfinite(player.x) || !std::isfinite(player.z) || !std::isfinite(player.angle) ||
                 player.x < 0 || player.z < 0 || player.x >= game_.maze.size().cols || player.z >= game_.maze.size().rows ||
                 (moving != 0 && moving != 1) || (running != 0 && running != 1)) continue;
             const MazePosition cell{ static_cast<int>(player.z), static_cast<int>(player.x) };
@@ -210,7 +216,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             unsigned version, generation, seed, phase; int rows, cols, selfSlot;
             if (!(in >> version)) continue;
-            if (version != 3)
+            if (version != 7)
             {
                 endNetwork(); menu_.showMultiplayer(); menu_.showMessage("Different game version. Everyone needs the same build.");
                 return;
@@ -286,7 +292,7 @@ void MazeApplication::updateNetwork(float seconds)
         {
             if (!(network_.connectedMask() & (1u << slot))) continue;
             std::ostringstream out;
-            out << "W 3 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
+            out << "W 7 " << networkGeneration_ << ' ' << game_.maze.size().rows << ' ' << game_.maze.size().cols
                 << ' ' << *game_.mazeSeed << ' ' << phase << ' ' << slot << ' ' << world;
             network_.send(out.str(), slot);
         }
@@ -335,6 +341,7 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
         if (key && key->code == sf::Keyboard::Key::Escape) showMainMenu();
         else if (key && key->code == sf::Keyboard::Key::R) restartCurrentGame();
         else if (key && key->code == sf::Keyboard::Key::B) gameView_.toggleHeadMotion();
+        else if (key && key->code == sf::Keyboard::Key::T) gameView_.toggleRayTracing();
         else if (key && key->code == sf::Keyboard::Key::M)
         {
             soundscape_.setMuted(!soundscape_.muted());
@@ -347,7 +354,9 @@ void MazeApplication::handleEvent(const sf::Event& event, sf::RenderWindow& wind
             {
                 sendPlayer(); network_.send(std::string("K ") + remoteKey);
             }
-            else if (networkRole_ != NetworkRole::Guest) gameView_.handleEvent(event, game_);
+            else if (networkRole_ != NetworkRole::Guest || (key && !networkPaused_ &&
+                (key->code == sf::Keyboard::Key::F || key->code == sf::Keyboard::Key::J ||
+                 key->code == sf::Keyboard::Key::Space))) gameView_.handleEvent(event, game_);
             if (game_.phase == GamePhase::Won)
             {
                 menu_.setHasActiveGame(false);

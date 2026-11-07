@@ -24,6 +24,29 @@ struct RemotePlayer
 {
     float x = .5f, z = .5f, angle = 0.f;
     bool moving = false, running = false, present = false;
+    float elevation = 0.f;
+};
+
+struct SafehouseDoor
+{
+    bool open = false;
+    float swing = 0.f;
+    float rattle = 0.f;
+};
+
+struct RefugeSlots
+{
+    unsigned spins = 0;
+    float stopTime = 0.f;
+    std::array<int, 3> symbols{};
+};
+
+struct RefugeBall
+{
+    float x = 0.f, y = .13f, z = 0.f;
+    float vx = 0.f, vy = 0.f, vz = 0.f;
+    int carrier = -1;
+    unsigned scoreA = 0, scoreB = 0;
 };
 
 constexpr int maxCoopPlayers = 4;
@@ -44,6 +67,9 @@ public:
     void setSoundMuted(bool muted);
     void setSoundAvailability(int status) noexcept;
     void toggleHeadMotion();
+    void toggleRayTracing();
+    bool rayTracingEnabled() const noexcept { return rayTraceEnabled_; }
+    bool rayTracingActive() const noexcept { return postReady_ && rayTraceEnabled_; }
     void setNetworkGuest(bool guest) noexcept { networkGuest_ = guest; if (!guest) networkSelfSlot_ = 0; }
     RemotePlayer localPlayer() const noexcept;
     void setRemotePlayer(int slot, const RemotePlayer& player) noexcept;
@@ -67,11 +93,26 @@ private:
     bool walkable(const GameState& game, float x, float z) const;
     void interact(GameState& game);
     int nearbyShrine() const;
+    int nearbyDoor() const;
+    int nearbySlotHandle() const;
+    void pullSlotHandle(const GameState& game);
     bool nearGate(const GameState& game) const;
     bool nearInscription() const;
     void resetHunter(const GameState& game);
     void updateMonster(GameState& game, float seconds, bool playerMoving, bool playerRunning);
     void updateShift(GameState& game, float seconds);
+    void updateDoors(float seconds);
+    void updateFear(GameState& game, float seconds);
+    void updateScares(GameState& game, float seconds);
+    void updateRefugeGames(float seconds);
+    void playRefugeBall(bool basketball, int slot);
+    void toggleDoor(int house, int side, bool slam = false);
+    bool doorBlocks(float x, float z) const;
+    unsigned int doorMask() const noexcept;
+    void drawDoors(const GameState& game);
+    bool preparePostProcessing();
+    void releasePostTargets();
+    void drawPostProcess(const GameState& game, float flash);
     void invalidateChunksAround(MazePosition cell);
     void prepareChunks(const GameState& game);
     void updateChunkVisibility(const GameState& game);
@@ -81,8 +122,12 @@ private:
     sf::Vector2u viewport_{ 900u, 600u };
     sf::Text heading_, objective_, journal_, hint_, seedText_, feedback_, staminaLabel_, soundLabel_;
     bool initialized_ = false;
-    std::unique_ptr<sf::Shader> worldShader_, creatureShader_, foliageShader_;
+    std::unique_ptr<sf::Shader> worldShader_, creatureShader_, foliageShader_, postShader_;
     bool shaderAttempted_ = false;
+    bool postReady_ = false;
+    sf::Texture sceneColor_;
+    unsigned int sceneDepth_ = 0, sceneFbo_ = 0;
+    sf::Vector2u postSize_{};
     unsigned int hedgeTexture_ = 0, groundTexture_ = 0, monsterTexture_ = 0, foliageTexture_ = 0;
     unsigned int shelterTexture_ = 0;
     unsigned int creatureMesh_ = 0, creatureTexture_ = 0;
@@ -97,9 +142,14 @@ private:
     int chunkRows_ = 0, chunkCols_ = 0;
     bool clearChunks_ = true;
     float x_ = .5f, z_ = .5f, angle_ = 0.f, pitch_ = 0.f, elapsed_ = 0.f;
+    float elevation_ = 0.f;
     float inscriptionX_ = .10f, inscriptionZ_ = .75f;
     float ambientTime_ = 0.f, darkness_ = 0.f;
     float bobPhase_ = 0.f, bobBlend_ = 0.f, sprintBlend_ = 0.f;
+    float fear_ = 0.f, scareClock_ = 0.f, rattleClock_ = 0.f;
+    std::uint32_t scareCount_ = 0, whisperEvent_ = 0, doorEvent_ = 0;
+    float whisperPan_ = 0.f, doorPan_ = 0.f;
+    bool doorSlam_ = false, rayTraceEnabled_ = true;
     bool headMotionEnabled_ = true;
     std::uint32_t thunderEvent_ = 0;
     bool soundMoving_ = false, soundRunning_ = false, soundMuted_ = false;
@@ -107,6 +157,11 @@ private:
     int networkSelfSlot_ = 0;
     std::array<RemotePlayer, maxCoopPlayers> remote_{}, remoteVisual_{};
     std::vector<MazePosition> safehouses_;
+    std::vector<std::array<RefugeBall, 2>> refugeBalls_;
+    unsigned fieldNotes_ = 0;
+    int journalPage_ = -1;
+    std::vector<RefugeSlots> refugeSlots_;
+    std::vector<std::array<SafehouseDoor, 4>> doors_;
     std::array<int, maxCoopPlayers> checkpoints_{ { -1, -1, -1, -1 } };
     std::array<std::uint32_t, maxCoopPlayers> remoteCaptures_{};
     std::uint32_t seenRemoteCaptures_ = 0;

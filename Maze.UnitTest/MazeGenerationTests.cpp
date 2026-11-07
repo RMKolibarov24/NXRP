@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <cstdint>
 #include <queue>
 #include <set>
@@ -128,15 +129,15 @@ namespace MazeUnitTest
                 const auto maze = generateMaze(size, seed);
                 const auto houses = generateSafehouses(size, seed);
                 const auto replay = generateSafehouses(size, seed);
-                Assert::IsTrue(houses.size() >= 2 && houses.size() <= 4);
+                Assert::IsTrue(houses.size() >= (size.rows < 15 && size.cols < 15 ? 1u : 2u) && houses.size() <= 4);
                 Assert::AreEqual(houses.size(), replay.size());
                 for (std::size_t i = 0; i < houses.size(); ++i)
                 {
                     Assert::IsTrue(houses[i].row == replay[i].row && houses[i].col == replay[i].col);
                     Assert::IsFalse(insideSafehouse({0,0}, houses[i]));
                     Assert::IsFalse(insideSafehouse({size.rows-1,size.cols-1}, houses[i]));
-                    for (int row = houses[i].row-1; row <= houses[i].row+1; ++row)
-                        for (int col = houses[i].col-1; col <= houses[i].col+1; ++col)
+                    for (int row = houses[i].row-2; row <= houses[i].row+2; ++row)
+                        for (int col = houses[i].col-2; col <= houses[i].col+2; ++col)
                         {
                             Assert::IsTrue(maze.at(row,col) == MazeCell::Passage);
                             Assert::AreEqual(static_cast<int>(i), safehouseAt({row,col}, houses));
@@ -147,6 +148,26 @@ namespace MazeUnitTest
                     Assert::IsTrue(maze.at(houses[i].row, houses[i].col + 2) == MazeCell::Passage);
                 }
             }
+        }
+
+        TEST_METHOD(SafehouseDoorFramesFillEachOpeningAndSwingOutward)
+        {
+            const MazePosition house{ 10, 12 };
+            const float hx = 12.5f, hz = 10.5f;
+            const auto nearly = [](float a, float b) { return std::abs(a - b) < .0001f; };
+            const auto places = [&](int side, float hingeX, float hingeZ, float centreX,
+                float centreZ, bool spansZ, bool anglePositive)
+            {
+                const auto frame = safehouseDoorFrame(house, side);
+                Assert::IsTrue(nearly(frame.hingeX, hx + (hingeX - hx) * refugeScale) && nearly(frame.hingeZ, hz + (hingeZ - hz) * refugeScale));
+                Assert::IsTrue(nearly(frame.centreX, hx + (centreX - hx) * refugeScale) && nearly(frame.centreZ, hz + (centreZ - hz) * refugeScale));
+                Assert::AreEqual(spansZ, frame.spansZ);
+                Assert::IsTrue(anglePositive == (frame.openAngle > 0.f));
+            };
+            places(0, hx - 1.45f, hz - .59f, hx - 1.45f, hz, true, false);
+            places(1, hx + 1.45f, hz - .59f, hx + 1.45f, hz, true, true);
+            places(2, hx - .59f, hz - 1.45f, hx, hz - 1.45f, false, true);
+            places(3, hx - .59f, hz + 1.45f, hx, hz + 1.45f, false, false);
         }
 
         TEST_METHOD(RefugesDoNotDisconnectHunterRoutes)

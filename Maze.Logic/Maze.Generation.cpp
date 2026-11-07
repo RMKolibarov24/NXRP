@@ -65,9 +65,9 @@ MazeGrid generateMaze(const MazeSize& size, std::uint32_t seed)
     for (const auto center : generateSafehouses(size, seed))
     {
         // A walkable outer ring lets the hunter route around the protected
-        // 3x3 interior even when the original maze passed through this spot.
-        for (int row = center.row - 2; row <= center.row + 2; ++row)
-            for (int col = center.col - 2; col <= center.col + 2; ++col)
+        // 5x5 interior even when the original maze passed through this spot.
+        for (int row = center.row - 3; row <= center.row + 3; ++row)
+            for (int col = center.col - 3; col <= center.col + 3; ++col)
                 maze.at(row, col) = MazeCell::Passage;
     }
 

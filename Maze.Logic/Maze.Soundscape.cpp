@@ -17,13 +17,29 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         if (frame.thunderEvent != 0 && frame.active) thunderDelay_ = 1.2f;
         thunderEvent_ = frame.thunderEvent;
     }
+    if (frame.doorEvent != doorEvent_)
+    {
+        if (frame.doorEvent != 0 && frame.active)
+        {
+            doorPhase_ = 0.f; doorAmp_ = frame.doorSlam ? 1.f : .62f; doorSlam_ = frame.doorSlam;
+        }
+        doorEvent_ = frame.doorEvent;
+    }
+    if (frame.whisperEvent != whisperEvent_)
+    {
+        if (frame.whisperEvent != 0 && frame.active) { whisperPhase_ = 0.f; whisperAmp_ = 1.f; }
+        whisperEvent_ = frame.whisperEvent;
+    }
     if (frame.active && frame.hunterChasing && !wasChasing_ && frame.threat > .05f) roar_ = 1.f;
     wasChasing_ = frame.active && frame.hunterChasing;
     const float dt = 1.f / static_cast<float>(sampleRate_);
     const float threat = std::clamp(frame.threat, 0.f, 1.f);
+    const float fear = std::clamp(frame.fear, 0.f, 1.f);
     const float shifting = std::clamp(frame.shifting, 0.f, 1.f);
     const float hunterPan = std::clamp(frame.hunterPan, -1.f, 1.f);
     const float shiftingPan = std::clamp(frame.shiftingPan, -1.f, 1.f);
+    const float doorPan = std::clamp(frame.doorPan, -1.f, 1.f);
+    const float whisperPan = std::clamp(frame.whisperPan, -1.f, 1.f);
     const float hunterPeriod = std::clamp(frame.hunterStepSeconds, .3f, 2.f);
     for (std::size_t i = 0; i < count; ++i)
     {
@@ -44,12 +60,35 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
             sample += envelope * (.10f * std::sin(footPhase_ * 2.f * pi * 62.f) + .03f * noise);
         }
         else footPhase_ = 0.f;
+        fear_ += .0015f * (fear - fear_);
+        const float pulse = std::max(threat, fear_ * .62f);
         heartPhase_ += dt;
-        const float heartPeriod = 1.25f - .35f * threat;
+        const float heartPeriod = 1.25f - .35f * pulse;
         if (heartPhase_ >= heartPeriod) heartPhase_ -= heartPeriod;
         const float first = std::exp(-heartPhase_ * 24.f);
         const float second = heartPhase_ >= .20f ? std::exp(-(heartPhase_ - .20f) * 30.f) * .7f : 0.f;
-        sample += threat * .11f * (first + second) * std::sin(heartPhase_ * 2.f * pi * 47.f);
+        sample += pulse * .11f * (first + second) * std::sin(heartPhase_ * 2.f * pi * 47.f);
+        // A sub-bass dread bed rises when the dark feels close.
+        sample += fear_ * (.020f * std::sin(time_ * 2.f * pi * 31.f)
+            + .010f * std::sin(time_ * 2.f * pi * 47.f + std::sin(time_ * .7f)));
+
+        doorPhase_ += dt;
+        doorAmp_ *= std::exp(-dt / (doorSlam_ ? .45f : 1.15f));
+        const float doorEnvelope = std::exp(-doorPhase_ * (doorSlam_ ? 10.f : 2.4f));
+        const float doorTone = doorSlam_
+            ? std::sin(doorPhase_ * 2.f * pi * 43.f) * .8f + noise * .35f
+            : std::sin(doorPhase_ * 2.f * pi * (175.f + 35.f * std::sin(doorPhase_ * 6.3f)))
+                * (.45f + .55f * noise);
+        const float door = doorEnvelope * doorAmp_ * .15f * doorTone;
+        doorPan_ += .004f * (doorPan - doorPan_);
+
+        whisperPhase_ += dt;
+        whisperAmp_ *= std::exp(-dt / 2.6f);
+        whisperNoise_ += .05f * (noise - whisperNoise_);
+        const float whisperEnvelope = std::sin(std::clamp(whisperPhase_ / 2.4f, 0.f, 1.f) * pi);
+        const float whisper = whisperAmp_ * whisperEnvelope * whisperNoise_
+            * (.55f + .45f * std::sin(time_ * 2.f * pi * 2.7f)) * .13f;
+        whisperPan_ += .004f * (whisperPan - whisperPan_);
         hunterPan_ += .0015f * (hunterPan - hunterPan_);
         shiftingPan_ += .0015f * (shiftingPan - shiftingPan_);
         if (frame.hunterMoving)
@@ -83,8 +122,10 @@ void SoundscapeSynth::render(std::int16_t* output, std::size_t count, const Soun
         sample += thunder_ * .48f * wind_;
         thunder_ *= std::exp(-dt / 1.8f);
         gain_ += .002f * ((frame.active ? 1.f : 0.f) - gain_);
-        const float left = sample + creature * (1.f - hunterPan_) + branches * (1.f - shiftingPan_);
-        const float right = sample + creature * (1.f + hunterPan_) + branches * (1.f + shiftingPan_);
+        const float left = sample + creature * (1.f - hunterPan_) + branches * (1.f - shiftingPan_)
+            + door * (1.f - doorPan_) + whisper * (1.f - whisperPan_);
+        const float right = sample + creature * (1.f + hunterPan_) + branches * (1.f + shiftingPan_)
+            + door * (1.f + doorPan_) + whisper * (1.f + whisperPan_);
         output[2 * i] = static_cast<std::int16_t>(std::clamp(left * gain_, -1.f, 1.f) * 32767.f);
         output[2 * i + 1] = static_cast<std::int16_t>(std::clamp(right * gain_, -1.f, 1.f) * 32767.f);
         time_ += dt;

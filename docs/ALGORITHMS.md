@@ -166,3 +166,33 @@ The board clips to its own area and leaves the HUD in pixel coordinates.
 Continue and resize retain zoom; New Game and Restart return to fit. Zoom does
 not change model cells, seed, position or successful-move count. Invalid or
 overflowed geometry returns no drawable layout before GameView changes its view.
+
+## Ray-traced lighting and fear
+
+Implementation: `Maze.Graphics/GameView.cpp`, `assets/shaders/post.frag`.
+
+```mermaid
+flowchart TD
+    A["Prepare scene FBO with colour and depth textures"] --> B["Render hedge, refuges, doors and creature"]
+    B --> C["Linearize depth and rebuild view position and normal"]
+    C --> D["Ray-march screen-space reflections"]
+    C --> E["Sample contact ambient occlusion"]
+    C --> F["March volumetric fog toward the flashlight"]
+    D --> G["Cold grade, fear warp, chromatic edges, grain and vignette"]
+    E --> G
+    F --> G
+    G --> H["Composite full-screen quad, then draw the HUD"]
+```
+
+The pass renders at the window resolution and only samples geometry already
+visible in the depth buffer, so it cannot reflect objects behind the camera.
+If framebuffer object entry points are unavailable the renderer draws directly,
+and **T** disables the expensive ray marches without disabling the grade.
+
+Fear is a smoothed 0..1 value built from creature proximity, darkness, pursuit
+and safehouse shelter. It feeds camera sway, flashlight interference, heartbeat
+rate, the post shader and the creature's door rattles. Safehouse doors are four
+per refuge; the host stores their open state in one bit mask appended to the
+version-4 world snapshot. Guests animate the received mask locally. A closed
+door blocks the threshold, an open door does not, and the creature may slam an
+open door but can never enter the refuge itself.

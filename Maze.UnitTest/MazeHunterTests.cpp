@@ -34,7 +34,7 @@ namespace MazeUnitTest
             MazeGrid maze({10,10});
             for (int col = 0; col < 10; ++col) maze.at(4,col) = MazeCell::Passage;
             const std::vector<MazePosition> houses{ {4,5} };
-            HunterState hunter; hunter.cell = {4,3}; hunter.previous = {4,2}; hunter.random = 7;
+            HunterState hunter; hunter.cell = {4,2}; hunter.previous = {4,1}; hunter.random = 7;
             const HunterTarget player{ {4,5}, true, true };
             for (int step = 0; step < 30; ++step)
             {

@@ -164,8 +164,10 @@ void Menu::resize(sf::Vector2u size)
         "WASD moves; mouse or left/right arrows turn.\n"
         "Shift runs, uses breath and makes noise.\n"
         "The creature sees and hears you. Caught? Your progress stays.\n"
-        "Safe houses repel it and remember your checkpoint.\n"
-        "The hedge shifts. M mutes; B toggles head motion.\n"
+        "Safehouse doors open with E; close one to hide inside.\n"
+        "Upstairs: G picks up/throws basketball; K kicks football.\n"
+        "Downstairs: face red slot handle, E pulls; F notes, J journal.\n"
+        "The hedge shifts. T toggles ray-traced light; B head motion; M sound.\n"
         "Esc pauses; R restarts this maze.\n"
         "Choose size and an optional seed in Settings.";
     // Keep the instructions above the Back button at the minimum window size.

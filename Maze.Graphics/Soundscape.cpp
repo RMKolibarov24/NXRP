@@ -11,9 +11,11 @@
 struct Soundscape::Impl
 {
     std::atomic<bool> stop{ false }, muted{ false }, active{ false }, moving{ false }, running{ false }, hunterMoving{ false }, hunterChasing{ false };
+    std::atomic<bool> doorSlam{ false };
     std::atomic<float> threat{ 0.f }, shifting{ 0.f }, hunterPan{ 0.f }, shiftingPan{ 0.f }, hunterStepSeconds{ 1.f };
+    std::atomic<float> fear{ 0.f }, doorPan{ 0.f }, whisperPan{ 0.f };
     std::atomic<int> status{ 0 };
-    std::atomic<std::uint32_t> thunderEvent{ 0 };
+    std::atomic<std::uint32_t> thunderEvent{ 0 }, doorEvent{ 0 }, whisperEvent{ 0 };
     std::thread worker;
 
     SoundscapeFrame frame() const noexcept
@@ -26,6 +28,9 @@ struct Soundscape::Impl
         result.hunterMoving = hunterMoving.load(); result.hunterStepSeconds = hunterStepSeconds.load();
         result.hunterChasing = hunterChasing.load();
         result.thunderEvent = thunderEvent.load();
+        result.fear = fear.load();
+        result.doorEvent = doorEvent.load(); result.doorPan = doorPan.load(); result.doorSlam = doorSlam.load();
+        result.whisperEvent = whisperEvent.load(); result.whisperPan = whisperPan.load();
         return result;
     }
 
@@ -106,6 +111,9 @@ void Soundscape::setFrame(const SoundscapeFrame& frame) noexcept
     impl_->hunterMoving.store(frame.hunterMoving); impl_->hunterChasing.store(frame.hunterChasing);
     impl_->hunterStepSeconds.store(frame.hunterStepSeconds);
     impl_->thunderEvent.store(frame.thunderEvent); impl_->active.store(frame.active);
+    impl_->fear.store(frame.fear); impl_->doorEvent.store(frame.doorEvent);
+    impl_->doorPan.store(frame.doorPan); impl_->doorSlam.store(frame.doorSlam);
+    impl_->whisperEvent.store(frame.whisperEvent); impl_->whisperPan.store(frame.whisperPan);
 }
 bool Soundscape::muted() const noexcept { return impl_->muted.load(); }
 int Soundscape::status() const noexcept { return impl_->status.load(); }

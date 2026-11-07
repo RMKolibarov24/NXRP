@@ -68,6 +68,30 @@ namespace MazeUnitTest
             Assert::IsFalse(first == second);
         }
 
+        TEST_METHOD(DoorAndWhisperEventsAddDirectionalAudio)
+        {
+            SoundscapeSynth calm, door, whisper;
+            SoundscapeFrame base; base.active = true;
+            SoundscapeFrame doorFrame = base;
+            doorFrame.doorEvent = 1; doorFrame.doorSlam = true; doorFrame.doorPan = -1.f;
+            SoundscapeFrame whisperFrame = base;
+            whisperFrame.whisperEvent = 1; whisperFrame.whisperPan = 1.f;
+            std::array<std::int16_t, 4096> a{}, b{}, c{};
+            calm.render(a.data(), a.size() / 2, base);
+            door.render(b.data(), b.size() / 2, doorFrame);
+            whisper.render(c.data(), c.size() / 2, whisperFrame);
+            long long doorDifference = 0, whisperDifference = 0;
+            for (std::size_t i = 0; i < a.size(); i += 2)
+            {
+                doorDifference += std::abs(static_cast<int>(b[i]) - static_cast<int>(a[i]));
+                doorDifference += std::abs(static_cast<int>(b[i+1]) - static_cast<int>(a[i+1]));
+                whisperDifference += std::abs(static_cast<int>(c[i]) - static_cast<int>(a[i]));
+                whisperDifference += std::abs(static_cast<int>(c[i+1]) - static_cast<int>(a[i+1]));
+            }
+            Assert::IsTrue(doorDifference > 2000);
+            Assert::IsTrue(whisperDifference > 500);
+        }
+
         TEST_METHOD(DirectionalSoundsPanWithoutChangingTheCenteredAmbience)
         {
             SoundscapeSynth leftSynth, rightSynth, centerSynth;
