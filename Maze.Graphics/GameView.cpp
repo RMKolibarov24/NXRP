@@ -1262,7 +1262,7 @@ void GameView::update(GameState& game, float seconds, const GameInput& input)
     seatedBlend_ += ((seatedHouse_>=0?1.f:0.f)-seatedBlend_)*std::min(1.f,seconds*8.f);
     bool pulling=false;
     for(const auto& machine:refugeSlots_)
-    { const float t=elapsed_-(machine.stopTime-2.f);pulling=pulling || (machine.actor==networkSelfSlot_ && machine.spins && t>=0.f && t<1.3f); }
+    { const float t=elapsed_-(machine.stopTime-2.f);pulling=pulling || (machine.actor==networkSelfSlot_ && machine.spins && t>=0.f && t<1.95f); }
     const float forward = seatedHouse_>=0 || pulling?0.f:std::clamp(input.forward, -1.f, 1.f);
     const float strafe = seatedHouse_>=0 || pulling?0.f:std::clamp(input.strafe, -1.f, 1.f);
     const float length = std::sqrt(forward * forward + strafe * strafe);
@@ -2221,6 +2221,11 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             barStoolMesh_=loadCreatureMesh(models/"bar-stool.nxm");
             drinkMesh_=loadCreatureMesh(models/"drink-cup.nxm");
             drinkTexture_=loadSurfaceTexture(models/"drink.png",1024);
+            if(sf::Shader::isAvailable())
+            {
+                auto shader=std::make_unique<sf::Shader>();
+                if(shader->loadFromFile(executableDirectory()/"assets"/"shaders"/"reel.vert",executableDirectory()/"assets"/"shaders"/"reel.frag"))reelShader_=std::move(shader);
+            }
             refugePropsAttempted_ = true;
         }
         glColor3f(1.f,1.f,1.f);
@@ -2231,10 +2236,20 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         for (int reel=0;reel<3;++reel)
         {
             const bool spinning=elapsed_<machine.stopTime-(2-reel)*.25f;
-            const int symbol=spinning?(static_cast<int>(elapsed_*18.f)+reel)%4:machine.symbols[reel];
+            const float travel=slotReelTravel(elapsed_,machine.stopTime,reel,machine.symbols[reel]);
+            const int symbol=spinning?static_cast<int>(travel)%4:machine.symbols[reel];
             glPushMatrix();
-            if (spinning) glTranslatef(0.f,.003f*std::sin(elapsed_*90.f+reel),0.f);
+            if(reelShader_)
+            {
+                reelShader_->setUniform("surface",0);
+                reelShader_->setUniform("scroll",spinning?travel-std::floor(travel):0.f);
+                const int tiles[]={7,8,10,11};
+                const int nextTile=tiles[(symbol+1)%4];
+                reelShader_->setUniform("nextCell",sf::Glsl::Vec2(static_cast<float>(nextTile%5),static_cast<float>(nextTile/5)));
+                sf::Shader::bind(reelShader_.get());
+            }
             if (reelMeshes_[reel][symbol]) glCallList(reelMeshes_[reel][symbol]);
+            if(reelShader_) sf::Shader::bind(nullptr);
             glPopMatrix();
         }
         const float pull = slotLeverDegrees(elapsed_,machine.stopTime);
@@ -2551,7 +2566,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
     {
         const float sway=std::sin(bobPhase_+side*1.2f)*bobBlend_*.007f;
         InteractionPoint pose{side==0?-.16f:.16f,-.12f+sway-crouchBlend_*.012f,-.31f};
-        float gripRotation=0.f,gripAmount=.5f*ballHoldBlend_;
+        float gripRotation=0.f,gripAmount=.5f*ballHoldBlend_,wristPitch=0.f;
         if(heldHouse>=0)
         {
             const auto& ball=refugeBalls_[heldHouse][1];
@@ -2573,12 +2588,14 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
         {
             const int house=nearbySlotHandle(); const auto& machine=refugeSlots_[house];
             const float t=elapsed_-(machine.stopTime-2.f);
-            if(t>=0.f && t<1.3f && machine.actor==networkSelfSlot_)
+            if(t>=0.f && t<1.95f && machine.actor==networkSelfSlot_)
             {
                 const auto knob=toCamera(slotKnobPoint(safehouses_[house],elapsed_,machine.stopTime));
-                const float reach=t<.25f?interactionSmooth(t/.25f):t>1.f?1.f-interactionSmooth((t-1.f)/.3f):1.f;
+                const float reach=slotHandReach(elapsed_,machine.stopTime);
                 pose.x+=(knob.x-.025f-pose.x)*reach; pose.y+=(knob.y-.015f-pose.y)*reach;pose.z+=(knob.z+.04f-pose.z)*reach;
-                gripRotation=25.f*reach;gripAmount=reach;
+                gripRotation=25.f*reach;
+                gripAmount=slotHandGrip(elapsed_,machine.stopTime);
+                wristPitch=slotLeverDegrees(elapsed_,machine.stopTime)*.45f*reach;
             }
         }
         glPushMatrix();glTranslatef(pose.x,pose.y,pose.z);glRotatef(gripRotation,0.f,0.f,1.f);
@@ -2590,7 +2607,7 @@ void GameView::draw(sf::RenderTarget& target, const GameState& game)
             glBindTexture(GL_TEXTURE_2D,drinkTexture_);glColor3f(.65f,.80f,.87f);glCallList(drinkMesh_);
             glColor3f(1.f,1.f,1.f);glBindTexture(GL_TEXTURE_2D,handTexture_);glPopMatrix();
         }
-        glRotatef(35.f,1.f,0.f,0.f);glRotatef(180.f,0.f,1.f,0.f);
+        glRotatef(35.f+wristPitch,1.f,0.f,0.f);glRotatef(180.f,0.f,1.f,0.f);
         if(handOpen_[side] && handGrip_[side])
         {
             const auto& open=*handOpen_[side];const auto& grip=*handGrip_[side];

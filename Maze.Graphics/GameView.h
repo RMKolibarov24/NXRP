@@ -131,7 +131,7 @@ private:
     sf::Vector2u viewport_{ 900u, 600u };
     sf::Text heading_, objective_, journal_, hint_, seedText_, feedback_, staminaLabel_, soundLabel_;
     bool initialized_ = false;
-    std::unique_ptr<sf::Shader> worldShader_, creatureShader_, foliageShader_, postShader_;
+    std::unique_ptr<sf::Shader> worldShader_, creatureShader_, foliageShader_, postShader_, reelShader_;
     bool shaderAttempted_ = false;
     bool postReady_ = false;
     sf::Texture sceneColor_;

@@ -27,6 +27,32 @@
 
 int main()
 {
+    // The hand must grip before the lever moves, follow its complete return,
+    // then open before withdrawing. Check motion across all phase boundaries.
+    assert(slotLeverDegrees(.29f,2.f)==0.f);
+    assert(slotHandGrip(.30f,2.f)>.999f);
+    assert(slotHandReach(1.64f,2.f)>.999f);
+    assert(slotHandGrip(1.80f,2.f)==0.f);
+    assert(slotHandReach(1.95f,2.f)==0.f);
+    for(float boundary: {.30f,.85f,.98f,1.65f})
+    {
+        constexpr float h=.0005f;
+        const float before=(slotLeverDegrees(boundary,2.f)-slotLeverDegrees(boundary-h,2.f))/h;
+        const float after=(slotLeverDegrees(boundary+h,2.f)-slotLeverDegrees(boundary,2.f))/h;
+        assert(std::abs(before-after)<2.f);
+    }
+    for(int reel=0;reel<3;++reel)for(int result=0;result<4;++result)
+    {
+        assert(slotReelTravel(.74f,2.f,reel,result)==0.f);
+        float previous=0.f;
+        for(int frame=0;frame<=480;++frame)
+        {
+            const float travel=slotReelTravel(frame/240.f,2.f,reel,result);
+            assert(travel>=previous-.00001f && travel<=12.f+result+.00001f);
+            previous=travel;
+        }
+        assert(std::abs(previous-(12.f+result))<.0001f);
+    }
     // Stair rise and gallery transition must agree with collision/camera height.
     const std::vector<MazePosition> refugeProbe{ { 4, 4 } };
     float stairHeight = 0.f;

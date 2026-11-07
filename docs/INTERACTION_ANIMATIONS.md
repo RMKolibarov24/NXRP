@@ -1,5 +1,22 @@
 # Physical interaction animation fixes
 
+## Slot motion refinement
+
+The sourced lever now uses quintic easing through reach, pull, hold and return,
+with a small damped spring motion. The palm tracks the knob until it returns;
+fingers close before the pull and open before withdrawal, with wrist pitch
+following the lever. Contact and movement lock last 1.95 seconds.
+
+Reels start after the physical pull and decelerate to staggered exact results.
+A shader scrolls between the existing source artwork tiles on the downloaded
+curved meshes, replacing rapid symbol swaps and positional jitter. No new model
+geometry was made. Systems without shader support retain eased symbol changes.
+
+Release Graphics and CoopSmoke builds pass. The real four-player TCP smoke
+passes, including sampled phase-boundary velocity continuity, grip timing,
+monotonic reel travel, exact stopping results, and rendered interaction checks.
+The broader realism, voice and poker work remains in progress.
+
 ## Changes
 
 - Bar now advertises E sit-and-drink, with a usable counter interaction region,
