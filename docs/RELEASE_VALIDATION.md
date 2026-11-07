@@ -66,3 +66,19 @@ branch feature/the-hedge, upgraded source commit a27b1c2. Follow-up validation
 documentation does not alter the packaged game binary.
 
 Final renderer probe reports: Screen-space ray tracing active: 1. Expanded four-player regression passes after this renderer check.
+
+## Downloaded-prop upgrade final artifact
+
+Archive: build/packages/TheHedge-Horror-Upgrade-Windows-x64.zip, 28,838,717 bytes.
+SHA256: 6C0557D875CE7257266E887817FBE480FF682132EE4E560BCE505AF5304DB2AA.
+Independently extracted to build/horror-package-verification. All 63 manifest
+entries matched SHA256. VERSION.txt records source b48373780b8dbdc708b500cc6bb2d02df10c0a51
+and protocol 9. Required downloaded-model credits and derived source assets are
+included. The executable was launched from that extracted package and observed
+as process 13380, responding True, title NXRP - The Hedge, window handle 2622096.
+Left running for the user. No desktop screenshot claim is made: rendered frames
+provide the visual evidence; process/window metadata confirms the package launch.
+
+GitHub independently confirmed open PR #6 uses aleksandarkolev-st/NXRP,
+feature/the-hedge, at b483737. The following documentation-only receipt commit
+does not change the packaged game binary or its source version record.
