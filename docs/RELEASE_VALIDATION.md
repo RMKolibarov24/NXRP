@@ -98,3 +98,18 @@ lock/Q stand, seated stance propagation, actor-specific slot state, finger mesh
 deformation, all sourced assets and existing gameplay. Interaction images are
 under build/bar-drinking.png, basketball-hands.png and slot-hand-contact.png.
 Final package and launch receipt follow after archive creation.
+
+## Interaction fix final artifact and launch
+
+Archive: build/packages/TheHedge-Interaction-Fix-Windows-x64.zip, 28,992,600 bytes.
+SHA256: EB35205C26DC45F70B329F888E818BF054252CA543E2ABC0620B40968F039224.
+Independent extraction under build/interaction-package-verification verified all
+69 SHA256 manifest entries. VERSION.txt records source commit
+1e7bdf48a6752789216a162d4cb6dd95d20e9497 and co-op protocol 10.
+Launched that extracted executable: process 34296, responding True, title
+NXRP - The Hedge, nonzero window handle 2884262. Left open for the user.
+
+GitHub independently confirmed PR #6 uses the fork aleksandarkolev-st/NXRP and
+head 1e7bdf4. Following receipt-only documentation commits do not change the
+packaged game binary. Final expanded smoke passes actual throw release and
+follow-through plus all earlier gameplay checks; 140 unit tests pass.
