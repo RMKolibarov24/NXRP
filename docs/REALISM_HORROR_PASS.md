@@ -1,0 +1,133 @@
+# Active realism/horror pass
+
+The full user scope remains active. Earlier releases are checkpoints, not proof
+that the complete pass is finished. Delivery requires verification, a fresh
+package, fork PR #6 updates and visible launch. Never author new model geometry.
+
+## Requirements and authoritative status
+
+1. Higher-quality downloaded hands, runtime skeletal animation and IK, finger
+   contact, weighted arms and throwing anticipation/follow-through: implemented
+   unsimplified source arms, original runtime bone hierarchy/skin weights,
+   two-bone IK, finger joints, restrained camera inertia and 0.28s shared throw
+   wind-up with continuous release/follow-through. See HandRig.h,
+   prepare_hand_rigs.py and INTERACTION_ANIMATIONS.md. Final play/pose review
+   remains required. Legacy morph hands are retained only as fallback.
+2. Roughness/normal maps, softer shadows, wet reflections and readable fog:
+   implemented matching sourced Poly Haven diffuse/normal/ARM maps for mud and
+   timber; mipmapped filtering, derivative tangent frames, roughness-driven
+   highlights and wet-only rough reflections. Four area-light depth rays soften
+   contact shadows. Refuge ground quads use dry timber; fog density is reduced
+   so distant silhouettes remain readable. Final screenshot/play review pending.
+3. Layered breathing, uneven steps, distant knocks and positional growls, with
+   wall/door muffling and silence: implemented acoustic transmission/filtering,
+   uneven footfall timing, paired knocks and ambient hush. Quantitative unit
+   checks pass. Final listening/device and render review still required.
+4. Fair unpredictable pursuit, lost trails, door lingering, learned escape
+   routes, breach warnings: implemented bounded last-evidence searches, two
+   paused search beats, local weighted exit checks, observed junction learning,
+   floor-aware senses and evidence-based interior pursuit/door testing. Learning
+   persists through captures but resets on a new run. New unit and TCP checks
+   cover hidden-player invariance, floor concealment, learning bias, search
+   expiry, stair pursuit/descent, captures and forced entry. Final play review
+   still required.
+5. Downloaded abandoned belongings, damaged shelters, footprints/scratched signs,
+   connected notes and distinct sections: **unfinished**. Current keeper notes
+   and scenery do not meet this full requirement. Source models and expand the
+   environmental story and distinct maze identities.
+6. Meaningful bar/slot noise, crouch concealment, running/breath risks, temporary
+   refuge with multiple exits and warnings: existing systems plus acoustic/floor
+   sensing now connect these risks. Final balance/play review remains required.
+
+## Added user scope
+
+- Slot improvements: independent checkpoint 5767a15, receipt da236b1, pushed to
+  fork feature/the-hedge feeding PR #6. Smooth reach/grip/pull/return/release,
+  wrist follow and decelerating source-artwork reels. Exact committed-source
+  builds and real four-player smoke pass; packaged and launched visibly.
+  See INTERACTION_ANIMATIONS.md and RELEASE_VALIDATION.md.
+- Proximity voice: implemented V push-to-talk, F8 global toggle and F1-F4 peer
+  mute. Windows waveIn opens only while focused eligible PTT is held; no files
+  are recorded. Pause/focus loss, disconnect, generation changes and mute clear
+  queues. Host authenticates actors, validates generations/replays/rate, relays
+  within 12 units; playback applies pan, distance, wall/door/floor filtering.
+  Audible speech generates hunter noise. Bounded queues drop speech ahead of
+  gameplay congestion. Two 20ms output buffers and four-frame peer queues bound
+  latency. Protocol 12 requires all co-op players to update together.
+  Synthetic real-TCP tests cover codec/parser bounds, identity spoofing, stale
+  generation/replay/rate rejection, no self echo, mute and range. All fixtures
+  disable audio device I/O: **actual microphone-to-remote-speaker testing remains
+  unverified**. Test that manually with two players before final voice sign-off.
+- Poker: source pack downloaded for evaluation under build/asset-sources.
+  Primary license verification, conversion and playable co-op poker remain
+  **unfinished**. Asset acquisition alone does not constitute poker gameplay.
+
+## Verification checkpoint
+
+Release Graphics and CoopSmoke build with installed VS2022 v143. The unit suite
+passes 147/147, including quantitative high-frequency loss at equal gain,
+closed-door sight/hearing, hidden upstairs motion independence, bounded search
+expiry, observed route learning and reproducible weighted search choices.
+Expanded real four-player TCP smoke passes after isolating other players during
+its single-target upstairs test. It checks quiet upstairs concealment, actual
+noise acquisition, continuous stair pursuit and descent, and protocol voice rate
+limits with device I/O disabled. Re-run latest smoke after any subsequent edits.
+
+Build: MSBuild NXRP.slnx /p:PlatformToolset=v143 /p:Configuration=Release
+/p:Platform=x64 /m /v:minimal. Build tools/CoopSmoke.vcxproj similarly, then run
+build/bin/Release/CoopSmoke.exe from the repository root (TCP 24817).
+Graphics build copies assets; CoopSmoke does not. Unit runner is VS vstest.console.
+
+## Next work
+
+1. Acoustic, fair-AI and voice checkpoint f81eb21 is pushed to PR #6.
+2. Verify and checkpoint the new source rigs and weighted throw pipeline; review
+   object contact and third-party licensing attribution before final delivery.
+3. Verify/checkpoint sourced PBR materials, softer contact shadows and readable
+   fog; source/license credits and GPU map-on/off checks have been added.
+4. Download licensed story props and build connected notes/distinct maze sections.
+5. Implement proper playable co-op poker with host-authoritative actions and
+   private hole cards; ship source licenses/credits for imported props/cards.
+6. Full audit against every requirement, real audio/voice/play review, fresh
+   package, PR update and launch. Do not mark the goal complete prematurely.
+
+Voice API references: Microsoft waveInOpen and Devices and Data Types:
+https://learn.microsoft.com/en-us/windows/win32/api/mmeapi/nf-mmeapi-waveinopen
+https://learn.microsoft.com/en-us/windows/win32/multimedia/devices-and-data-types
+
+## Skeletal arm checkpoint
+
+New primary NXR rigs preserve the unsimplified downloaded anatomical body,
+original hierarchy/weights and separate full-size source skin. Graphics and
+CoopSmoke Release/x64 build without warnings. The expanded real four-player
+TCP smoke passes with rig load/deformation, arm length/wrist-target checks,
+singular/unreachable IK, malformed header rejection, shared wind-up state,
+delayed release, actual hoop scoring and all previous gameplay/voice checks.
+Rendered basketball hold, wind-up, release, lever contact and drinking frames
+were inspected. The drinking wrist frame now follows the vessel orientation;
+source meshes are never replaced with authored geometry. Protocol is now 12.
+Final broad pass packaging, listening, play balance and voice hardware checks
+remain outstanding; do not mark the six-part goal complete at this checkpoint.
+
+## Materials/lighting checkpoint
+
+Downloaded Poly Haven Brown Mud Leaves 01 and Weathered Brown Planks diffuse,
+OpenGL normal and ARM maps at 1K. Original checksums/sizes were verified; source
+URLs and checksums ship in assets/textures/pbr/SOURCES.json. Source authors,
+CC0 and API credit are recorded in texture credits/README. The optional import
+tool reproduces the converted PNG maps; there are no runtime network requests.
+
+Primary ground and timber use matched maps with mipmapping, derivative tangent
+frames, source occlusion and roughness-dependent highlights. Wet mud recesses
+receive a darker water film and roughness-dependent screen-space reflection
+strength/blur. Dry refuge ground uses the timber material on the existing quads.
+Four nearby moon rays provide softer screen-space contact shadows. Fog now keeps
+passage silhouettes readable. Reflection and shadow limits remain screen-space;
+offscreen geometry is not represented and the T toggle retains a cheaper path.
+
+Release builds and expanded real TCP/GPU smoke pass. The GPU test compares a
+frozen render with maps enabled/disabled and verifies substantial pixel changes;
+shader compile and source-map load are required. Interior, exterior and an actual
+maze passage with the hunter at its far end were rendered and inspected. The
+hunter remains recognizable; warm/colourful interior contrast is retained.
+Final full-goal play/audio/voice-device review and packaging remain outstanding.

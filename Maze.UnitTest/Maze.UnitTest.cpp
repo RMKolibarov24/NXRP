@@ -27,7 +27,7 @@ namespace MazeUnitTest
 
         TEST_METHOD(AcceptsMaximum)
         {
-            AssertSizeValidity(MazeSize(50, 50), true);
+            AssertSizeValidity(MazeSize(MAX_MAZE_SIZE, MAX_MAZE_SIZE), true);
         }
 
         TEST_METHOD(RejectsTooFewRows)
@@ -37,7 +37,7 @@ namespace MazeUnitTest
 
         TEST_METHOD(RejectsTooManyRows)
         {
-            AssertSizeValidity(MazeSize(51, 10), false);
+            AssertSizeValidity(MazeSize(MAX_MAZE_SIZE + 1, 10), false);
         }
 
         TEST_METHOD(RejectsTooFewColumns)
@@ -47,7 +47,7 @@ namespace MazeUnitTest
 
         TEST_METHOD(RejectsTooManyColumns)
         {
-            AssertSizeValidity(MazeSize(10, 51), false);
+            AssertSizeValidity(MazeSize(10, MAX_MAZE_SIZE + 1), false);
         }
 
         TEST_METHOD(AcceptsRectangularSizes)

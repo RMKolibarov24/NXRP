@@ -12,12 +12,23 @@
     <ClCompile Include="Maze.Logic.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="Maze.Game.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="Maze.Generation.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Maze.Puzzle.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Maze.Hunter.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Maze.Soundscape.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Maze.Atmosphere.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Maze.CreatureMesh.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="Maze.Settings.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Maze.Validation.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="Maze.Game.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="Maze.Generation.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Maze.Puzzle.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Maze.Safehouse.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Maze.Hunter.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Maze.Soundscape.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Maze.Atmosphere.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Maze.CreatureMesh.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="Maze.Settings.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
 </Project>

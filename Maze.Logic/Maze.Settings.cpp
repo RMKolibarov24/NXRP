@@ -6,7 +6,7 @@
 
 MazeSize loadMazeSizePreferences(const std::filesystem::path& filePath)
 {
-    const MazeSize defaults(MIN_MAZE_SIZE, MIN_MAZE_SIZE);
+    const MazeSize defaults(DEFAULT_MAZE_SIZE, DEFAULT_MAZE_SIZE);
     if (filePath.empty()) return defaults;
 
     std::ifstream file(filePath, std::ios::binary);

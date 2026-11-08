@@ -18,7 +18,10 @@ int main()
         }
         font.setSmooth(false);
 
-        sf::RenderWindow window(sf::VideoMode({ 900u, 600u }), "NXRP - Maze");
+        sf::ContextSettings context;
+        context.depthBits = 24;
+        sf::RenderWindow window(sf::VideoMode({ 900u, 600u }), "NXRP - The Hedge", sf::Style::Default,
+            sf::State::Windowed, context);
         window.setMinimumSize(sf::Vector2u{ 640u, 560u });
         window.setFramerateLimit(60);
         window.setKeyRepeatEnabled(false);
@@ -34,8 +37,8 @@ int main()
             }
             if (!window.isOpen()) break;
 
-            application.update(window.mapPixelToCoords(sf::Mouse::getPosition(window)));
-            window.clear(sf::Color{ 18, 22, 31 });
+            application.update(window);
+            window.clear(sf::Color{ 13, 19, 17 });
             application.draw(window);
             window.display();
         }
