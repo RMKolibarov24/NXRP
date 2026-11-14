@@ -16,8 +16,8 @@ namespace MazeUnitTest
             Assert::IsFalse(game.hasActiveGame());
             Assert::IsTrue(game.maze.empty());
             Assert::AreEqual(std::size_t{ 0 }, game.maze.cellCount());
-            Assert::AreEqual(10, game.selectedSize.rows);
-            Assert::AreEqual(10, game.selectedSize.cols);
+            Assert::AreEqual(DEFAULT_MAZE_SIZE, game.selectedSize.rows);
+            Assert::AreEqual(DEFAULT_MAZE_SIZE, game.selectedSize.cols);
             Assert::AreEqual(0, game.player.row);
             Assert::AreEqual(0, game.player.col);
             Assert::IsTrue(game.statistics.elapsed == std::chrono::steady_clock::duration::zero());

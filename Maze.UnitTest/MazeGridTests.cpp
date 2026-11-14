@@ -62,11 +62,11 @@ namespace MazeUnitTest
 
         TEST_METHOD(MaximumGridStartsWithWalls)
         {
-            const MazeGrid grid(MazeSize(50, 50));
+            const MazeGrid grid(MazeSize(MAX_MAZE_SIZE, MAX_MAZE_SIZE));
             Assert::IsFalse(grid.empty());
-            Assert::AreEqual(50, grid.size().rows);
-            Assert::AreEqual(50, grid.size().cols);
-            Assert::AreEqual(std::size_t{ 2500 }, grid.cellCount());
+            Assert::AreEqual(MAX_MAZE_SIZE, grid.size().rows);
+            Assert::AreEqual(MAX_MAZE_SIZE, grid.size().cols);
+            Assert::AreEqual(std::size_t{ 10000 }, grid.cellCount());
             AssertAllCells(grid, MazeCell::Wall);
         }
 
@@ -89,7 +89,7 @@ namespace MazeUnitTest
         TEST_METHOD(InvalidDimensionsThrow)
         {
             const MazeSize sizes[] = {
-                { 9, 10 }, { 51, 10 }, { 10, 9 }, { 10, 51 },
+                { 9, 10 }, { 101, 10 }, { 10, 9 }, { 10, 101 },
                 { 0, 10 }, { 10, 0 }, { -1, 10 }, { 10, -1 },
                 { INT_MIN, 10 }, { 10, INT_MIN },
                 { INT_MAX, 10 }, { 10, INT_MAX }

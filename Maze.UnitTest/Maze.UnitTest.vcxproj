@@ -102,6 +102,11 @@
     <ClCompile Include="GameStateTests.cpp" />
     <ClCompile Include="MazeMovementTests.cpp" />
     <ClCompile Include="MazeGenerationTests.cpp" />
+    <ClCompile Include="MazePuzzleTests.cpp" />
+    <ClCompile Include="MazeHunterTests.cpp" />
+    <ClCompile Include="SoundscapeTests.cpp" />
+    <ClCompile Include="MazeAtmosphereTests.cpp" />
+    <ClCompile Include="CreatureMeshTests.cpp" />
     <ClCompile Include="MazeSessionTests.cpp" />
     <ClCompile Include="MazeSettingsTests.cpp" />
     <ClCompile Include="GameStatisticsTests.cpp" />

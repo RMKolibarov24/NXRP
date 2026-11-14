@@ -2,9 +2,14 @@
 #include "CppUnitTest.h"
 #include "Maze.Game.h"
 #include "Maze.Generation.h"
+#include "Maze.Safehouse.h"
+#include "Maze.Story.h"
+#include "Maze.Puzzle.h"
+#include "Maze.Adventure.h"
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <cstdint>
 #include <queue>
 #include <set>
@@ -21,7 +26,7 @@ namespace MazeUnitTest
     {
         constexpr std::uint32_t fixedSeeds[] = { 0, 1, 42, 12345, 0x80000000U, UINT32_MAX };
         const MazeSize invalidSizes[] = {
-            { 9, 10 }, { 51, 10 }, { 10, 9 }, { 10, 51 }, { 0, 10 }, { 10, 0 },
+            { 9, 10 }, { 101, 10 }, { 10, 9 }, { 10, 101 }, { 0, 10 }, { 10, 0 },
             { -1, -1 }, { INT_MIN, 10 }, { INT_MAX, 10 }, { 10, INT_MIN }, { 10, INT_MAX }
         };
 
@@ -119,6 +124,177 @@ namespace MazeUnitTest
     TEST_CLASS(MazeGenerationTests)
     {
     public:
+        TEST_METHOD(AdventureTransactionsAreAtomicAndBounded)
+        {
+            Adventure::Pack pack;const auto initial=pack;
+            Assert::IsFalse(Adventure::buy(pack,4));Assert::AreEqual(initial.coins,pack.coins);
+            Assert::IsTrue(Adventure::buy(pack,0));Assert::AreEqual(6u,pack.coins);Assert::AreEqual(2u,pack.items[0]);
+            Assert::IsTrue(Adventure::craft(pack,0));Assert::AreEqual(0u,pack.materials[0]);
+            const auto before=pack;Assert::IsFalse(Adventure::craft(pack,0));Assert::IsTrue(before.materials==pack.materials && before.items==pack.items);
+            Assert::IsFalse(Adventure::sell(pack));Assert::AreEqual(before.coins,pack.coins);
+            pack.materials={1,1,1};Assert::IsTrue(Adventure::sell(pack));Assert::AreEqual(15u,pack.coins);
+            pack.items[0]=99;Assert::IsFalse(Adventure::buy(pack,0));Assert::AreEqual(15u,pack.coins);
+            pack.effects={12,15,20};pack.echoTime=8;Adventure::tick(pack,30);Assert::IsTrue(pack.effects==std::array<float,3>{});Assert::AreEqual(0.f,pack.echoTime);
+            Assert::IsTrue(Adventure::valid(pack));pack.effects[0]=13;Assert::IsFalse(Adventure::valid(pack));
+        }
+        TEST_METHOD(AdventureCachesAreSeededPassableAndSpaced)
+        {
+            for(const MazeSize size:{MazeSize{10,10},MazeSize{30,30},MazeSize{100,100}})
+            for(unsigned seed=0;seed<12;++seed)
+            {
+                const auto maze=generateMaze(size,seed);const auto puzzle=generateMazePuzzle(maze,seed);
+                const auto caches=Adventure::caches(maze,seed,puzzle.stones),replay=Adventure::caches(maze,seed,puzzle.stones);
+                Assert::IsTrue(!caches.empty() && caches.size()<=48 && caches.size()==replay.size());
+                for(std::size_t i=0;i<caches.size();++i)
+                {
+                    const auto cache=caches[i];Assert::IsTrue(maze.at(cache.cell.row,cache.cell.col)==MazeCell::Passage);
+                    Assert::IsTrue(cache.kind>=0 && cache.kind<3 && cache.coins>=3 && cache.coins<=7);
+                    Assert::AreEqual(cache.cell.row,replay[i].cell.row);Assert::AreEqual(cache.cell.col,replay[i].cell.col);
+                    Assert::IsTrue(safehouseAt(cache.cell,generateSafehouses(size,seed))<0);
+                    for(std::size_t j=0;j<i;++j)Assert::IsTrue(std::abs(cache.cell.row-caches[j].cell.row)+std::abs(cache.cell.col-caches[j].cell.col)>=3);
+                }
+            }
+        }
+        TEST_METHOD(CollapsedSheltersHaveOpenBypassesAndPreserveRefuges)
+        {
+            for(const MazeSize size: {MazeSize{10,10},MazeSize{10,100},MazeSize{25,30},MazeSize{100,100}})
+            for(unsigned seed=0;seed<16;++seed)
+            {
+                const auto ruin=generateStoryRuin(size,seed);Assert::IsTrue(ruin.has_value());
+                const auto maze=generateMaze(size,seed);const auto houses=generateSafehouses(size,seed);
+                int blocked=0;
+                for(int r=0;r<size.rows;++r)for(int c=0;c<size.cols;++c)
+                    if(storyRuinReserved({r,c},ruin))
+                    {
+                        Assert::IsTrue(safehouseAt({r,c},houses)<0);
+                        if(storyRuinBlocked({r,c},ruin))
+                        {++blocked;Assert::IsTrue(maze.at(r,c)==MazeCell::Wall);}
+                        else Assert::IsTrue(maze.at(r,c)==MazeCell::Passage);
+                    }
+                Assert::AreEqual(3,blocked);
+                const auto replay=generateStoryRuin(size,seed);
+                Assert::AreEqual(ruin->cell.row,replay->cell.row);Assert::AreEqual(ruin->cell.col,replay->cell.col);
+            }
+        }
+        TEST_METHOD(StorySitesAndBootTrailsAreReachableAndReproducible)
+        {
+            for(const MazeSize size: {MazeSize{10,10},MazeSize{20,30},MazeSize{100,100}})
+            for(unsigned seed=0;seed<8;++seed)
+            {
+                const auto maze=generateMaze(size,seed);const auto puzzle=generateMazePuzzle(maze,seed);
+                const auto sites=generateStorySites(maze,seed,puzzle.stones),replay=generateStorySites(maze,seed,puzzle.stones);
+                for(int i=0;i<4;++i)
+                {
+                    Assert::IsTrue(maze.at(sites[i].cell.row,sites[i].cell.col)==MazeCell::Passage);
+                    Assert::AreEqual(sites[i].cell.row,replay[i].cell.row);Assert::AreEqual(sites[i].cell.col,replay[i].cell.col);
+                    for(const auto stone:puzzle.stones)Assert::IsFalse(stone.row==sites[i].cell.row && stone.col==sites[i].cell.col);
+                }
+                const auto houses=generateSafehouses(size,seed);
+                const auto prints=generateStoryFootsteps(maze,sites,houses);
+                Assert::IsTrue(!prints.empty() && prints.size()<=24);
+                for(auto print:prints)
+                {
+                    const MazePosition at{static_cast<int>(print.z),static_cast<int>(print.x)};
+                    Assert::IsTrue(maze.contains(at) && maze.at(at.row,at.col)==MazeCell::Passage);
+                    Assert::IsTrue(safehouseAt(at,houses)<0);
+                    Assert::IsTrue(std::abs(print.cosine*print.cosine+print.sine*print.sine-1.f)<.0001f);
+                }
+            }
+        }
+        TEST_METHOD(SeededSafehousesAreDistinctOpenAndReproducible)
+        {
+            const MazeSize sizes[] = { {10,10}, {10,100}, {30,30}, {99,100}, {100,100} };
+            for (const auto size : sizes) for (std::uint32_t seed = 0; seed < 32; ++seed)
+            {
+                const auto maze = generateMaze(size, seed);
+                const auto houses = generateSafehouses(size, seed);
+                const auto replay = generateSafehouses(size, seed);
+                Assert::IsTrue(houses.size() >= (size.rows < 15 && size.cols < 15 ? 1u : 2u) && houses.size() <= 4);
+                Assert::AreEqual(houses.size(), replay.size());
+                for (std::size_t i = 0; i < houses.size(); ++i)
+                {
+                    Assert::IsTrue(houses[i].row == replay[i].row && houses[i].col == replay[i].col);
+                    Assert::IsFalse(insideSafehouse({0,0}, houses[i]));
+                    Assert::IsFalse(insideSafehouse({size.rows-1,size.cols-1}, houses[i]));
+                    for (int row = houses[i].row-2; row <= houses[i].row+2; ++row)
+                        for (int col = houses[i].col-2; col <= houses[i].col+2; ++col)
+                        {
+                            Assert::IsTrue(maze.at(row,col) == MazeCell::Passage);
+                            Assert::AreEqual(static_cast<int>(i), safehouseAt({row,col}, houses));
+                        }
+                    Assert::IsTrue(maze.at(houses[i].row - 2, houses[i].col) == MazeCell::Passage);
+                    Assert::IsTrue(maze.at(houses[i].row + 2, houses[i].col) == MazeCell::Passage);
+                    Assert::IsTrue(maze.at(houses[i].row, houses[i].col - 2) == MazeCell::Passage);
+                    Assert::IsTrue(maze.at(houses[i].row, houses[i].col + 2) == MazeCell::Passage);
+                }
+            }
+        }
+
+        TEST_METHOD(SafehouseDoorFramesFillEachOpeningAndSwingOutward)
+        {
+            const MazePosition house{ 10, 12 };
+            const float hx = 12.5f, hz = 10.5f;
+            const auto nearly = [](float a, float b) { return std::abs(a - b) < .0001f; };
+            const auto places = [&](int side, float hingeX, float hingeZ, float centreX,
+                float centreZ, bool spansZ, bool anglePositive)
+            {
+                const auto frame = safehouseDoorFrame(house, side);
+                Assert::IsTrue(nearly(frame.hingeX, hx + (hingeX - hx) * refugeScale) && nearly(frame.hingeZ, hz + (hingeZ - hz) * refugeScale));
+                Assert::IsTrue(nearly(frame.centreX, hx + (centreX - hx) * refugeScale) && nearly(frame.centreZ, hz + (centreZ - hz) * refugeScale));
+                Assert::AreEqual(spansZ, frame.spansZ);
+                Assert::IsTrue(anglePositive == (frame.openAngle > 0.f));
+            };
+            places(0, hx - 1.45f, hz - .59f, hx - 1.45f, hz, true, false);
+            places(1, hx + 1.45f, hz - .59f, hx + 1.45f, hz, true, true);
+            places(2, hx - .59f, hz - 1.45f, hx, hz - 1.45f, false, true);
+            places(3, hx - .59f, hz + 1.45f, hx, hz + 1.45f, false, false);
+        }
+
+        TEST_METHOD(RefugesDoNotDisconnectHunterRoutes)
+        {
+            const MazeSize sizes[] = { {10,10}, {10,100}, {30,30}, {65,90}, {100,100} };
+            for (const auto size : sizes) for (std::uint32_t seed = 0; seed < 32; ++seed)
+            {
+                const auto maze = generateMaze(size, seed);
+                const auto houses = generateSafehouses(size, seed);
+                std::vector<bool> reached(maze.cellCount(), false);
+                std::queue<MazePosition> pending; pending.push({0,0}); reached[0] = true;
+                constexpr MazePosition directions[] = { {-1,0}, {1,0}, {0,-1}, {0,1} };
+                while (!pending.empty())
+                {
+                    const auto current = pending.front(); pending.pop();
+                    for (const auto d : directions)
+                    {
+                        const MazePosition next{current.row+d.row,current.col+d.col};
+                        if (!maze.contains(next) || maze.at(next.row,next.col)==MazeCell::Wall || safehouseAt(next,houses)>=0) continue;
+                        const auto index = static_cast<std::size_t>(next.row*size.cols+next.col);
+                        if (!reached[index]) { reached[index]=true; pending.push(next); }
+                    }
+                }
+                for (int row=0; row<size.rows; ++row) for (int col=0; col<size.cols; ++col)
+                    if (maze.at(row,col)!=MazeCell::Wall && safehouseAt({row,col},houses)<0)
+                        Assert::IsTrue(reached[static_cast<std::size_t>(row*size.cols+col)]);
+            }
+        }
+        TEST_METHOD(SeededMazesIncludeAlternateRoutes)
+        {
+            const MazeSize sizes[] = { {10, 10}, {11, 12}, {30, 25}, {50, 50} };
+            for (const auto size : sizes) for (std::uint32_t seed = 0; seed < 16; ++seed)
+            {
+                const auto maze = generateMaze(size, seed);
+                int vertices = 0, edges = 0;
+                for (int row = 0; row < size.rows; ++row) for (int col = 0; col < size.cols; ++col)
+                {
+                    if (maze.at(row, col) == MazeCell::Wall) continue;
+                    ++vertices;
+                    if (row + 1 < size.rows && maze.at(row + 1, col) != MazeCell::Wall) ++edges;
+                    if (col + 1 < size.cols && maze.at(row, col + 1) != MazeCell::Wall) ++edges;
+                }
+                // For a connected graph, at least as many edges as vertices means a cycle.
+                Assert::IsTrue(edges >= vertices);
+            }
+        }
+
         TEST_METHOD(GeneratesMinimumSizeWithReachableExit)
         {
             AssertSizeForFixedSeeds({ 10, 10 });
@@ -131,7 +307,7 @@ namespace MazeUnitTest
 
         TEST_METHOD(GeneratesMaximumSizeWithReachableExit)
         {
-            AssertSizeForFixedSeeds({ 50, 50 });
+            AssertSizeForFixedSeeds({ MAX_MAZE_SIZE, MAX_MAZE_SIZE });
         }
 
         TEST_METHOD(SupportsEvenAndOddRectangles)
@@ -181,9 +357,9 @@ namespace MazeUnitTest
 
         TEST_METHOD(AllAllowedDimensionsHaveReachableExit)
         {
-            for (int rows = 10; rows <= 50; ++rows)
+            for (int rows = MIN_MAZE_SIZE; rows <= MAX_MAZE_SIZE; ++rows)
             {
-                for (int cols = 10; cols <= 50; ++cols)
+                for (int cols = MIN_MAZE_SIZE; cols <= MAX_MAZE_SIZE; ++cols)
                 {
                     const MazeSize size(rows, cols);
                     const auto seed = static_cast<std::uint32_t>(rows * 100 + cols);

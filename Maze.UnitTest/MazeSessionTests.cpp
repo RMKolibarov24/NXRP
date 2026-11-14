@@ -67,8 +67,8 @@ namespace MazeUnitTest
             endGame(game);
             endGame(game);
             AssertEnded(game);
-            Assert::AreEqual(10, game.selectedSize.rows);
-            Assert::AreEqual(10, game.selectedSize.cols);
+            Assert::AreEqual(DEFAULT_MAZE_SIZE, game.selectedSize.rows);
+            Assert::AreEqual(DEFAULT_MAZE_SIZE, game.selectedSize.cols);
         }
 
         TEST_METHOD(EndGameHandlesPausedAndWonGames)

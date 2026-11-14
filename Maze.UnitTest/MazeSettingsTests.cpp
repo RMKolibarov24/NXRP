@@ -73,7 +73,7 @@ namespace MazeUnitTest
         TEST_METHOD(MissingFileUsesDefaultsWithoutWriting)
         {
             SettingsDirectory directory;
-            AssertSize(loadMazeSizePreferences(directory.file()), 10, 10);
+            AssertSize(loadMazeSizePreferences(directory.file()), DEFAULT_MAZE_SIZE, DEFAULT_MAZE_SIZE);
             Assert::IsFalse(std::filesystem::exists(directory.file()));
         }
 
@@ -89,7 +89,7 @@ namespace MazeUnitTest
         TEST_METHOD(LoadsBoundarySizes)
         {
             SettingsDirectory directory;
-            for (const auto size : { MazeSize(10, 10), MazeSize(10, 50), MazeSize(50, 10), MazeSize(50, 50) })
+            for (const auto size : { MazeSize(10, 10), MazeSize(10, 100), MazeSize(100, 10), MazeSize(100, 100) })
             {
                 WriteText(directory.file(), std::to_string(size.rows) + " " + std::to_string(size.cols));
                 AssertSize(loadMazeSizePreferences(directory.file()), size.rows, size.cols);
@@ -99,10 +99,10 @@ namespace MazeUnitTest
         TEST_METHOD(InvalidDimensionsUseDefaults)
         {
             SettingsDirectory directory;
-            for (const auto input : { "9 20", "20 9", "51 20", "20 51", "0 0", "-10 20", "20 -10" })
+            for (const auto input : { "9 20", "20 9", "101 20", "20 101", "0 0", "-10 20", "20 -10" })
             {
                 WriteText(directory.file(), input);
-                AssertSize(loadMazeSizePreferences(directory.file()), 10, 10);
+                AssertSize(loadMazeSizePreferences(directory.file()), DEFAULT_MAZE_SIZE, DEFAULT_MAZE_SIZE);
             }
         }
 
@@ -113,7 +113,7 @@ namespace MazeUnitTest
                 "20.5 20", "999999999999999999999999 20", "20 999999999999999999999999", "20 20\x1a extra" })
             {
                 WriteText(directory.file(), input);
-                AssertSize(loadMazeSizePreferences(directory.file()), 10, 10);
+                AssertSize(loadMazeSizePreferences(directory.file()), DEFAULT_MAZE_SIZE, DEFAULT_MAZE_SIZE);
             }
         }
 
@@ -142,19 +142,19 @@ namespace MazeUnitTest
             SettingsDirectory directory;
             WriteText(directory.file(), "12 37\n");
             const auto before = ReadText(directory.file());
-            for (const auto size : { MazeSize(9, 20), MazeSize(20, 51), MazeSize(-1, 20) })
+            for (const auto size : { MazeSize(9, 20), MazeSize(20, 101), MazeSize(-1, 20) })
             {
                 Assert::IsFalse(saveMazeSizePreferences(directory.file(), size));
                 Assert::IsTrue(ReadText(directory.file()) == before);
             }
             const auto absent = directory.file().parent_path() / "must-not-create" / "settings.txt";
-            Assert::IsFalse(saveMazeSizePreferences(absent, { 51, 20 }));
+            Assert::IsFalse(saveMazeSizePreferences(absent, { 101, 20 }));
             Assert::IsFalse(std::filesystem::exists(absent.parent_path()));
         }
 
         TEST_METHOD(EmptyPathUsesDefaultsAndCannotSave)
         {
-            AssertSize(loadMazeSizePreferences({}), 10, 10);
+            AssertSize(loadMazeSizePreferences({}), DEFAULT_MAZE_SIZE, DEFAULT_MAZE_SIZE);
             Assert::IsFalse(saveMazeSizePreferences({}, { 12, 37 }));
         }
 
@@ -162,7 +162,7 @@ namespace MazeUnitTest
         {
             SettingsDirectory directory;
             std::filesystem::create_directory(directory.file());
-            AssertSize(loadMazeSizePreferences(directory.file()), 10, 10);
+            AssertSize(loadMazeSizePreferences(directory.file()), DEFAULT_MAZE_SIZE, DEFAULT_MAZE_SIZE);
         }
 
         TEST_METHOD(SaveFailsWhenParentIsAFile)

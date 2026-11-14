@@ -11,8 +11,8 @@
 
 namespace
 {
-    const sf::Color textColor{ 235, 240, 248 };
-    const sf::Color mutedColor{ 151, 164, 184 };
+    const sf::Color textColor{ 231, 226, 198 };
+    const sf::Color mutedColor{ 151, 163, 144 };
 
     void centerText(sf::Text& text, sf::Vector2f position)
     {
@@ -78,11 +78,11 @@ bool Menu::Button::hit(sf::Vector2f point) const
 void Menu::Button::update(sf::Vector2f mousePosition)
 {
     const bool hovered = hit(mousePosition);
-    shape.setFillColor(!enabled ? sf::Color{ 30, 37, 49 }
-        : hovered ? sf::Color{ 76, 137, 225 } : sf::Color{ 45, 90, 170 });
-    shape.setOutlineColor(!enabled ? sf::Color{ 45, 54, 70 }
-        : hovered ? sf::Color{ 140, 185, 248 } : sf::Color{ 73, 114, 178 });
-    label.setFillColor(enabled ? textColor : sf::Color{ 113, 127, 148 });
+    shape.setFillColor(!enabled ? sf::Color{ 22, 28, 26 }
+        : hovered ? sf::Color{ 67, 76, 57 } : sf::Color{ 35, 44, 37 });
+    shape.setOutlineColor(!enabled ? sf::Color{ 40, 48, 42 }
+        : hovered ? sf::Color{ 190, 178, 126 } : sf::Color{ 81, 94, 75 });
+    label.setFillColor(enabled ? textColor : sf::Color{ 103, 113, 100 });
 }
 
 void Menu::Button::draw(sf::RenderTarget& target) const
@@ -99,12 +99,14 @@ Menu::Menu(const sf::Font& font)
       rowName_(font, "Rows", 24), colName_(font, "Columns", 24),
       rowValue_(font, "", 28), colValue_(font, "", 28), sizeSummary_(font, "", 19),
       seedLabel_(font, "Seed", 24), seedValue_(font, "", 22),
+      addressLabel_(font, "Host address", 20), addressValue_(font, "", 20),
       mainButtons_{
           Button(font, "Continue", MenuAction::Continue),
-          Button(font, "New Game", MenuAction::NewGame),
+          Button(font, "Begin expedition", MenuAction::NewGame),
           Button(font, "Restart maze", MenuAction::RestartMaze),
           Button(font, "How to Play", MenuAction::HowToPlay),
           Button(font, "Settings", MenuAction::Settings),
+          Button(font, "Multiplayer", MenuAction::Multiplayer),
           Button(font, "Exit", MenuAction::Exit)
       },
       sizeButtons_{
@@ -112,15 +114,22 @@ Menu::Menu(const sf::Font& font)
           Button(font, "-", MenuAction::None), Button(font, "+", MenuAction::None)
       },
       backButton_(font, "Back", MenuAction::Back),
-      applyButton_(font, "Apply", MenuAction::ApplySettings)
+      applyButton_(font, "Apply", MenuAction::ApplySettings),
+      hostButton_(font, "Host game", MenuAction::HostGame),
+      joinButton_(font, "Join game", MenuAction::JoinGame),
+      guidePrevious_(font, "Previous", MenuAction::None),
+      guideNext_(font, "Next", MenuAction::None)
 {
     for (auto* text : { &title_, &rules_, &victorySummary_, &rowName_, &colName_, &rowValue_, &colValue_, &seedLabel_, &seedValue_ })
         text->setFillColor(textColor);
     for (auto* text : { &subtitle_, &message_, &sizeSummary_, &victoryStatistics_, &victorySeed_ })
         text->setFillColor(mutedColor);
     rules_.setLineSpacing(1.1f);
-    seedField_.setFillColor({ 30, 37, 49 });
+    seedField_.setFillColor({ 22, 28, 26 });
     seedField_.setOutlineThickness(1.f);
+    addressLabel_.setFillColor(textColor); addressValue_.setFillColor(textColor);
+    addressField_.setFillColor({ 22, 28, 26 }); addressField_.setOutlineThickness(1.f);
+    addressField_.setOutlineColor({ 190, 178, 126 });
     showMain();
 }
 
@@ -131,33 +140,47 @@ void Menu::resize(sf::Vector2u size)
     const float width = static_cast<float>(size.x);
     const float height = static_cast<float>(size.y);
     const float center = std::floor(width / 2.f);
-    title_.setFillColor(screen_ == Screen::Victory ? sf::Color{ 73, 190, 126 } : textColor);
+    title_.setFillColor(screen_ == Screen::Victory ? sf::Color{ 190, 199, 166 } : textColor);
     centerText(title_, { center, 56.f });
     centerText(subtitle_, { center, 103.f });
 
     const float buttonWidth = std::min(320.f, width - 80.f);
-    constexpr float buttonStep = 54.f;
-    const float mainHeight = buttonStep * static_cast<float>(mainButtons_.size() - 1) + 48.f;
+    constexpr float buttonStep = 48.f;
+    const float mainHeight = buttonStep * static_cast<float>(mainButtons_.size() - 1) + 42.f;
     const float top = std::max(144.f, (height - mainHeight) / 2.f + 16.f);
     for (std::size_t index = 0; index < mainButtons_.size(); ++index)
         mainButtons_[index].setBounds({ center - buttonWidth / 2.f, top + buttonStep * static_cast<float>(index) },
-            { buttonWidth, 48.f });
+            { buttonWidth, 42.f });
 
     message_.setString(wrapText(notice_, font_, 18, width - 80.f));
     centerText(message_, { center, height - 45.f });
     centerText(victorySummary_, { center, std::floor(height / 2.f - 100.f) });
     centerText(victoryStatistics_, { center, std::floor(height / 2.f - 64.f) });
     centerText(victorySeed_, { center, std::floor(height / 2.f - 138.f) });
-    rules_.setString(wrapText(
-        "Start in the top-left corner.\n"
-        "Reach the green exit at the bottom-right.\n"
-        "Arrow keys move one cell at a time.\n"
-        "Walls and maze edges block movement.\n"
-        "Esc opens the menu; Continue resumes the same game.\n"
-        "R restarts the same maze at the start.\n"
-        "Mouse wheel or +/- zooms. 0 fits the maze.\n"
-        "Choose size and an optional seed in Settings.\n"
-        "After winning: Restart maze, New Game or Main menu.", font_, 20, width - 112.f));
+    static constexpr const char* guidePages[]={
+        "Explore the living labyrinth. E opens treasure caches for ingredients and crowns. New districts reward 4 crowns. Tab opens an atlas of the routes you have explored.\n\n"
+        "I opens your satchel; 1-6 uses an item. Potions restore breath, conceal you or speed you up. Relics reveal paths, recall you to a refuge or cast a distracting echo.\n\n"
+        "WASD moves; mouse looks; Shift runs; Space jumps; Ctrl/C crouches. F reads belongings; J rereads notes.",
+        "Press E at the entrance inscription. Find three engraved stones, then follow the task: touch them in order, or light stones whose numbers total the target.\n\n"
+        "E toggles a balance stone; * marks lit stones. A wrong sequence resets its progress.\n\n"
+        "At the gate, transform the stone numbers using its inscription. Type 1-9, Enter to try, Backspace to edit. Walk through the open gate.",
+        "Trading posts are your bases. O at the keeper's counter opens the shop. 1-6 buys an item; 7 sells one of each ingredient for 9 crowns.\n\n"
+        "N inside a post opens the workbench. Recipes use dewleaf, moon salt and old brass from caches. I opens your satchel; Q closes menus. Entering a post sets your Recall destination.\n\n"
+        "The warden can enter. Find an exit on the first strike; leave on the second. The third forces the door. Veil hides you from sight, but noise still carries.",
+        "P at the downstairs bar deals Keeper's Draw. Press 1-5 to hold cards, then P to replace the rest once. P deals again after the result; Q puts the cards away. Scores are individual.\n\n"
+        "Upstairs, G picks up or throws the basketball. Keep facing the hoop through the wind-up. K kicks the football. Scores are shared.\n\n"
+        "All games are free play. The world keeps moving while you play, and card noise can give you away.",
+        "Multiplayer hosts up to four survivors. Everyone needs the same build. Host listens on TCP 24816; guests enter the host's reachable address or TCP tunnel.\n\n"
+        "Hold V for nearby voice chat. Walls and doors muffle speech. F8 toggles voice; F1-F4 mute individual speakers locally. Voice can attract the hunter.\n\n"
+        "Esc pauses. R restarts this maze. T toggles ray-traced light; B toggles head motion; M toggles game sound. Settings chooses the next size and seed."
+    };
+    for (unsigned int fontSize = 21; fontSize >= 18; --fontSize)
+    {
+        rules_.setCharacterSize(fontSize);
+        rules_.setString(wrapText(guidePages[guidePage_], font_, fontSize, width - 112.f));
+        const auto body=rules_.getLocalBounds();
+        if (body.position.y+body.size.y <= height - 279.f || fontSize == 18) break;
+    }
     rules_.setOrigin({ 0.f, 0.f });
     rules_.setPosition({ std::round((width - rules_.getLocalBounds().size.x) / 2.f), 155.f });
 
@@ -173,6 +196,15 @@ void Menu::resize(sf::Vector2u size)
     seedField_.setPosition({ center - 40.f, std::floor(height / 2.f + 32.f) });
     seedField_.setSize({ 220.f, 44.f });
     refreshSettings();
+    addressLabel_.setPosition({ center - 205.f, 214.f });
+    addressField_.setPosition({ center - 205.f, 245.f }); addressField_.setSize({ 410.f, 44.f });
+    addressValue_.setPosition({ center - 193.f, 254.f });
+    auto visibleAddress = multiplayerAddress_;
+    addressValue_.setString(visibleAddress);
+    while (!visibleAddress.empty() && addressValue_.getLocalBounds().size.x > 386.f)
+    { visibleAddress.erase(0, 1); addressValue_.setString("..." + visibleAddress); }
+    hostButton_.setBounds({ center - 205.f, 320.f }, { 195.f, 48.f });
+    joinButton_.setBounds({ center + 10.f, 320.f }, { 195.f, 48.f });
 
     backButton_.label.setString(screen_ == Screen::Settings ? "Cancel"
         : screen_ == Screen::Victory ? "Main menu" : "Back");
@@ -191,6 +223,11 @@ void Menu::resize(sf::Vector2u size)
             { buttonWidth, 48.f });
     }
     else backButton_.setBounds({ center - 100.f, height - 108.f }, { 200.f, 48.f });
+    if(screen_==Screen::HowToPlay)
+    {
+        guidePrevious_.setBounds({center-280.f,height-108.f},{160.f,48.f});
+        guideNext_.setBounds({center+120.f,height-108.f},{160.f,48.f});
+    }
 }
 
 void Menu::setHasActiveGame(bool active)
@@ -208,8 +245,8 @@ void Menu::setCanRestart(bool available)
 void Menu::showMain()
 {
     screen_ = Screen::Main;
-    title_.setString("NXRP MAZE");
-    subtitle_.setString("Find your way out.");
+    title_.setString("WAYWARD");
+    subtitle_.setString("Trade. Brew. Find your way through the living labyrinth.");
     mainButtons_[0].enabled = hasActiveGame_;
     mainButtons_[2].enabled = canRestart_;
     if (hasActiveGame_) notice_ = "An active game is available.";
@@ -221,21 +258,39 @@ void Menu::showMain()
 void Menu::showHowToPlay()
 {
     screen_ = Screen::HowToPlay;
-    title_.setString("How to Play");
-    subtitle_.setString("The goal and controls");
+    guidePage_=0;
+    title_.setString("KEEPER'S FIELD GUIDE");
+    refreshGuide();
+}
+
+void Menu::refreshGuide()
+{
+    static constexpr const char* chapters[]={"AN EXPEDITION BEGINS","THE STONES AND THE GATE","KEEPERS AND ALCHEMY","GAMES AFTER DARK","CO-OP AND CONTROLS"};
+    guidePage_=std::clamp(guidePage_,0,4);
+    subtitle_.setString(std::to_string(guidePage_+1)+" / 5   -   "+chapters[guidePage_]);
+    guidePrevious_.enabled=guidePage_>0;guideNext_.enabled=guidePage_<4;
     resize(viewport_);
 }
 
 void Menu::showSettings(const MazeSize& selectedSize, std::optional<std::uint32_t> seed)
 {
     if (!isValidMazeSize(selectedSize))
-        throw std::invalid_argument("Settings require rows and columns between 10 and 50.");
+        throw std::invalid_argument("Settings require rows and columns between 10 and 100.");
     screen_ = Screen::Settings;
     draftSize_ = selectedSize;
     draftSeedText_ = seed ? std::to_string(*seed) : "";
     seedFocused_ = true;
     title_.setString("Settings");
     subtitle_.setString("Choose size and seed for your next game.");
+    resize(viewport_);
+}
+
+void Menu::showMultiplayer()
+{
+    screen_ = Screen::Multiplayer;
+    title_.setString("Multiplayer");
+    subtitle_.setString("Up to four players. Host or join a TCP address.");
+    notice_ = "Host forwards port 24816 with ngrok; share the TCP address.";
     resize(viewport_);
 }
 
@@ -283,7 +338,7 @@ void Menu::refreshSettings()
     const bool validSeed = draftSeed(seed);
     applyButton_.enabled = validSeed;
     seedField_.setOutlineColor(!validSeed ? sf::Color{ 236, 106, 106 }
-        : seedFocused_ ? sf::Color{ 140, 185, 248 } : sf::Color{ 75, 91, 115 });
+        : seedFocused_ ? sf::Color{ 190, 178, 126 } : sf::Color{ 81, 94, 75 });
     auto visibleSeed = draftSeedText_;
     seedValue_.setString(draftSeedText_.empty() ? "Random" : visibleSeed);
     while (!visibleSeed.empty() && seedValue_.getLocalBounds().size.x > seedField_.getSize().x - 24.f)
@@ -293,9 +348,10 @@ void Menu::refreshSettings()
     }
     seedValue_.setPosition(seedField_.getPosition() + sf::Vector2f{ 12.f, 8.f });
     sizeSummary_.setFillColor(validSeed ? mutedColor : sf::Color{ 236, 106, 106 });
-    sizeSummary_.setString(std::string(validSeed ? "Rows/cols: 10-50. Blank seed = random."
+    sizeSummary_.setString(std::string(validSeed ? "Rows/cols: 10-100. Blank seed = random."
         : "Seed: 0-4294967295, or leave blank.")
-        + "\nSize persists. Seed applies for this launch.");
+        + "\nSize persists. Seed applies for this launch."
+        + "\nHold Shift and click +/- to change by 10.");
     centerText(sizeSummary_, { center, std::floor(static_cast<float>(viewport_.y) / 2.f + 112.f) });
     sizeButtons_[0].enabled = draftSize_.rows > MIN_MAZE_SIZE;
     sizeButtons_[1].enabled = draftSize_.rows < MAX_MAZE_SIZE;
@@ -305,6 +361,17 @@ void Menu::refreshSettings()
 
 MenuAction Menu::handleEvent(const sf::Event& event, const sf::RenderWindow& window)
 {
+    if (screen_ == Screen::Multiplayer)
+    {
+        if (const auto* text = event.getIf<sf::Event::TextEntered>())
+        {
+            if (text->unicode == U'\b') { if (!multiplayerAddress_.empty()) multiplayerAddress_.pop_back(); }
+            else if (text->unicode >= 33 && text->unicode < 127 && multiplayerAddress_.size() < 128)
+                multiplayerAddress_ += static_cast<char>(text->unicode);
+            resize(viewport_);
+            return MenuAction::None;
+        }
+    }
     if (screen_ == Screen::Settings && seedFocused_)
     {
         if (const auto* text = event.getIf<sf::Event::TextEntered>())
@@ -321,6 +388,23 @@ MenuAction Menu::handleEvent(const sf::Event& event, const sf::RenderWindow& win
     }
     if (const auto* key = event.getIf<sf::Event::KeyPressed>())
     {
+        if(screen_==Screen::HowToPlay && (key->code==sf::Keyboard::Key::Left || key->code==sf::Keyboard::Key::Right))
+        {
+            guidePage_+=key->code==sf::Keyboard::Key::Left?-1:1;refreshGuide();return MenuAction::None;
+        }
+        if (screen_ == Screen::Multiplayer)
+        {
+            if (key->code == sf::Keyboard::Key::Enter) return MenuAction::JoinGame;
+            if (key->code == sf::Keyboard::Key::Delete) multiplayerAddress_.clear();
+            if (key->control && key->code == sf::Keyboard::Key::V)
+            {
+                multiplayerAddress_.clear();
+                for (const auto code : sf::Clipboard::getString())
+                    if (code >= 33 && code < 127 && multiplayerAddress_.size() < 128)
+                        multiplayerAddress_ += static_cast<char>(code);
+            }
+            resize(viewport_);
+        }
         if (screen_ == Screen::Settings)
         {
             if (key->code == sf::Keyboard::Key::Enter && applyButton_.enabled)
@@ -355,17 +439,29 @@ MenuAction Menu::handleEvent(const sf::Event& event, const sf::RenderWindow& win
     }
     else
     {
+        if(screen_==Screen::HowToPlay)
+        {
+            if(guidePrevious_.hit(point)) {--guidePage_;refreshGuide();return MenuAction::None;}
+            if(guideNext_.hit(point)) {++guidePage_;refreshGuide();return MenuAction::None;}
+        }
         if (backButton_.hit(point)) return MenuAction::Back;
         if (screen_ == Screen::Victory && mainButtons_[1].hit(point)) return MenuAction::NewGame;
         if (screen_ == Screen::Victory && mainButtons_[2].hit(point)) return MenuAction::RestartMaze;
+        if (screen_ == Screen::Multiplayer)
+        {
+            if (hostButton_.hit(point)) return MenuAction::HostGame;
+            if (joinButton_.hit(point)) return MenuAction::JoinGame;
+        }
         if (screen_ == Screen::Settings)
         {
             seedFocused_ = seedField_.getGlobalBounds().contains(point);
             if (applyButton_.hit(point)) return MenuAction::ApplySettings;
-            if (sizeButtons_[0].hit(point)) --draftSize_.rows;
-            else if (sizeButtons_[1].hit(point)) ++draftSize_.rows;
-            else if (sizeButtons_[2].hit(point)) --draftSize_.cols;
-            else if (sizeButtons_[3].hit(point)) ++draftSize_.cols;
+            const int step = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)
+                || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift) ? 10 : 1;
+            if (sizeButtons_[0].hit(point)) draftSize_.rows = std::max(MIN_MAZE_SIZE, draftSize_.rows - step);
+            else if (sizeButtons_[1].hit(point)) draftSize_.rows = std::min(MAX_MAZE_SIZE, draftSize_.rows + step);
+            else if (sizeButtons_[2].hit(point)) draftSize_.cols = std::max(MIN_MAZE_SIZE, draftSize_.cols - step);
+            else if (sizeButtons_[3].hit(point)) draftSize_.cols = std::min(MAX_MAZE_SIZE, draftSize_.cols + step);
             refreshSettings();
         }
     }
@@ -381,6 +477,8 @@ void Menu::update(sf::Vector2f mousePosition)
     else
     {
         backButton_.update(mousePosition);
+        if(screen_==Screen::HowToPlay) {guidePrevious_.update(mousePosition);guideNext_.update(mousePosition);}
+        if (screen_ == Screen::Multiplayer) { hostButton_.update(mousePosition); joinButton_.update(mousePosition); }
         if (screen_ == Screen::Victory)
         {
             mainButtons_[1].update(mousePosition);
@@ -406,7 +504,12 @@ void Menu::draw(sf::RenderTarget& target) const
     else
     {
         backButton_.draw(target);
-        if (screen_ == Screen::HowToPlay) target.draw(rules_);
+        if (screen_ == Screen::HowToPlay) {target.draw(rules_);guidePrevious_.draw(target);guideNext_.draw(target);}
+        else if (screen_ == Screen::Multiplayer)
+        {
+            target.draw(addressLabel_); target.draw(addressField_); target.draw(addressValue_);
+            hostButton_.draw(target); joinButton_.draw(target); target.draw(message_);
+        }
         else if (screen_ == Screen::Victory)
         {
             target.draw(victorySummary_);

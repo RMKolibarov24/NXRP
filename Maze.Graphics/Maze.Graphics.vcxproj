@@ -46,7 +46,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>shell32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;winmm.lib;ws2_32.lib;shell32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);$(NXRPRepoRoot)Maze.Data;$(NXRPRepoRoot)Maze.Logic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -54,7 +54,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
-      <AdditionalDependencies>shell32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;winmm.lib;ws2_32.lib;shell32.lib;ole32.lib;uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir);$(NXRPRepoRoot)Maze.Data;$(NXRPRepoRoot)Maze.Logic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -64,6 +64,9 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="menu.cpp" />
     <ClCompile Include="GameView.cpp" />
+    <ClCompile Include="Soundscape.cpp" />
+    <ClCompile Include="VoiceChat.cpp" />
+    <ClCompile Include="Multiplayer.cpp" />
     <ClCompile Include="GameStatisticsText.cpp" />
     <ClCompile Include="MazeApplication.cpp" />
     <ClCompile Include="ExecutablePath.cpp" />
@@ -72,9 +75,12 @@
   <ItemGroup>
     <ClInclude Include="menu.h" />
     <ClInclude Include="GameView.h" />
+    <ClInclude Include="Soundscape.h" />
+    <ClInclude Include="Multiplayer.h" />
     <ClInclude Include="MazeViewport.h" />
     <ClInclude Include="GameStatisticsText.h" />
     <ClInclude Include="MazeApplication.h" />
+    <ClInclude Include="HandRig.h" />
     <ClInclude Include="ExecutablePath.h" />
     <ClInclude Include="SettingsPath.h" />
   </ItemGroup>

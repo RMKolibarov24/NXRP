@@ -14,7 +14,7 @@ MazeGrid::MazeGrid(const MazeSize& size)
 {
     if (!size_.isValid())
     {
-        throw std::invalid_argument("Maze rows and columns must each be between 10 and 50.");
+        throw std::invalid_argument("Maze rows and columns must each be between 10 and 100.");
     }
 
     cells_ = std::make_unique<MazeCell[]>(cellCount());

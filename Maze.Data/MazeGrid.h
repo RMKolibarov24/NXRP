@@ -13,7 +13,7 @@ public:
     // An empty grid represents the absence of maze data and owns no memory.
     MazeGrid() noexcept;
 
-    // Throws std::invalid_argument unless each dimension is within 10..50.
+    // Throws std::invalid_argument unless each dimension is within 10..100.
     // All cells initially contain walls. Allocation failures propagate.
     explicit MazeGrid(const MazeSize& size);
     ~MazeGrid() = default;

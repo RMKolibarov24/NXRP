@@ -18,7 +18,7 @@ enum class GamePhase
 struct GameState
 {
     MazeGrid maze;
-    MazeSize selectedSize{ MIN_MAZE_SIZE, MIN_MAZE_SIZE };
+    MazeSize selectedSize{ DEFAULT_MAZE_SIZE, DEFAULT_MAZE_SIZE };
     MazePosition player;
     GamePhase phase = GamePhase::Menu;
     GameStatistics statistics;
